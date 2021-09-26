@@ -31,7 +31,13 @@ enum OpCode {
 	OP_GET_LOCAL = 0x20,
 	OP_F32_ADD = 0x92,
 
-	OP_I32_CONST = 0x41
+	OP_I32_CONST = 0x41,
+
+	OP_I32_ADD = 0x6A,
+	OP_I32_SUB = 0x6B,
+	OP_I32_MUL = 0x6C,
+	OP_I32_DIV_S = 0x6D,
+	OP_I32_DIV_U = 0x6E,
 };
 
 // http://webassembly.github.io/spec/core/binary/modules.html#export-section

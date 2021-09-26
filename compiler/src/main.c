@@ -49,13 +49,16 @@ static unsigned long WASM_header(unsigned char *c) {
 	return 8;
 }
 
-int atoi(const char *str) {
+int atoi(char **str) {
 	int num = 0;
-	while (*str >= '0' && *str <= '9') {
+	int is_negative = (**str == '-');
+	str += is_negative;
+	while (**str >= '0' && **str <= '9') {
 		num *= 10;
-		num += *str - '0';
-		++str;
+		num += **str - '0';
+		*str += 1;
 	}
+	if (is_negative) num *= -1;
 	return num;
 }
 
@@ -99,19 +102,39 @@ export unsigned int compile() {
 	c[9] = 0x0;
 	c += 10;
 
-	int n = atoi(compile_text);
-	int n_byte_length = EncodeLEB128(c + 6, n);
-	// print("Byte Length:");
-	// print_int(n_byte_length);
+	char *ct = (char *)compile_text;
+
+	c += 5;
+
+	int n = atoi(&ct);
+	int n_byte_length = 0;
+	c[n_byte_length++] = OP_I32_CONST;
+	n_byte_length += EncodeLEB128(c + n_byte_length, n);
+
+	while (*ct) {
+		char op = *ct;
+		ct += 1;
+		int n = atoi(&ct);
+		c[n_byte_length++] = OP_I32_CONST;
+		n_byte_length += EncodeLEB128(c + n_byte_length, n);
+		if (op == '+') {
+			c[n_byte_length++] = OP_I32_ADD;
+		} else if (op == '-') {
+			c[n_byte_length++] = OP_I32_SUB;
+		} else {
+			return 0;
+		}
+	}
+	c[n_byte_length++] = OP_END;
+
+	c -= 5;
 
 	c[0] = SECTION_CODE;
-	c[1] = 5 + n_byte_length;
+	c[1] = 3 + n_byte_length;
 	c[2] = 0x1;
-	c[3] = 3 + n_byte_length;
+	c[3] = 1 + n_byte_length;
 	c[4] = 0x0;
-	c[5] = OP_I32_CONST;
-	c[6 + n_byte_length] = OP_END;
-	c += 7 + n_byte_length;
+	c += 5 + n_byte_length;
 
 	return c - compiled_code;
 }

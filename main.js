@@ -1,10 +1,14 @@
 import compiler from "./compiler.js"
 
-const compileButton = document.getElementById("compile_button");
 const editor = document.getElementById("editor");
 
-compileButton.onclick = async () => {
+let timeoutId = 0;
+editor.onkeydown = () => {
+	clearTimeout(timeoutId);
+	timeoutId = setTimeout(compile, 150);
+}
 
+async function compile() {
 	const { value } = editor;
 	const encoder = new TextEncoder('utf-8');
 	const addr = compiler.get_mem_addr();
@@ -14,10 +18,13 @@ compileButton.onclick = async () => {
 	view[value.length] = 0;
 
 	const len = compiler.compile();
+	if (len == 0) {
+		console.log("== Compilation Failed == ");
+		return;
+	}
 	const view2 = new Uint8Array(compiler.memory.buffer, compiler.get_compiled_code(), len);
-	console.log(view2);
 
 	const { instance } = await WebAssembly.instantiate(view2);
-	console.log("=== Compilation Successful ===");
 	console.log(instance.exports.main());
+	console.log("== Compilation Successful == ");
 }
