@@ -23,6 +23,7 @@ async function compile() {
 		return;
 	}
 	const view2 = new Uint8Array(compiler.memory.buffer, compiler.get_compiled_code(), len);
+	console.log(view2);
 
 	const { instance } = await WebAssembly.instantiate(view2);
 	console.log(instance.exports.main());
