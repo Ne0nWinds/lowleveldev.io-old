@@ -4,6 +4,59 @@
 #define is_whitespace(c) (c == ' ' || c == '\r' || c == '\n' || c == '\t')
 #define len(arr) (sizeof(arr) / sizeof(arr[0]))
 
+#include <stdarg.h>
+#include <stdbool.h>
+// clang generates seems to expect memset/memcpy to be defined like this?
+void *memset(void *str, int c, unsigned int n) {
+	for (unsigned int i = 0; i < n; ++i) {
+		((unsigned char *)str)[i] = c;
+	}
+	return str;
+}
+void *memcpy(void *dest, const void *src, unsigned int n) {
+	for (unsigned int i = 0; i < n; ++i) {
+		((unsigned char *)dest)[i] = ((unsigned char *)src)[i];
+	}
+	return dest;
+}
+unsigned int strlen(const char *str) {
+	unsigned int n = 0;
+	while (*str++) ++n;
+	return n;
+}
+int vprintf(const char *fmt, va_list ap) {
+	static char buffer[512] = {0};
+	unsigned int b = 0;
+	for (unsigned int f = 0; fmt[f] && f < len(buffer); ++f) {
+		if (fmt[f] != '%') {
+			buffer[b++] = fmt[f];
+		} else {
+			f += 1;
+			switch (fmt[f]) {
+				case 's': {
+					const char *str = va_arg(ap, const char *);
+					while (*str) buffer[b++] = *str++;
+				} break;
+				case '%': {
+					buffer[b++] = '%';
+				} break;
+				default: {
+					return -1;
+				} break;
+			}
+		}
+	}
+	_print(buffer, b);
+	return b;
+}
+int printf(const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	int b = vprintf(fmt, ap);
+	va_end(ap);
+	return b;
+}
+
 void print(const char *src) {
 	unsigned int i = 0;
 	while (src[i] != 0) ++i;
@@ -31,40 +84,27 @@ struct Token {
 	unsigned int len;
 };
 
-// clang generates seems to expect memset to be defined like this?
-void *memset(void *str, int c, unsigned int n) {
-	unsigned char *str_as_byte = str;
-	for (unsigned int i = 0; i < n; ++i) {
-		str_as_byte[i] = c;
-	}
-	return str;
+char compile_text[1024] = {0};
+
+__attribute__((export_name("get_mem_addr")))
+char *get_mem_addr() {
+	return compile_text;
 }
 
-#include <stdarg.h>
-#include <stdbool.h>
-static void error(char *fmt, ...) {
+static void verror_at(char *loc, char *fmt, va_list ap) {
+	int pos = loc - compile_text;
+	vprintf(fmt, ap);
+}
+static void error_at(char *loc, char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
-	char buffer[1024] = {0};
-	unsigned int b = 0;
-	for (unsigned int f = 0; fmt[f]; ++f) {
-		if (fmt[f] != '%') {
-			buffer[b++] = fmt[f];
-		} else {
-			f += 1;
-			switch (fmt[f]) {
-				case 's': {
-					const char *str = va_arg(ap, const char *);
-					while (*str)
-						buffer[b++] = *str++;
-				} break;
-				case '%': {
-					buffer[b++] = '%';
-				} break;
-			}
-		}
-	}
-	_print(buffer, b);
+	verror_at(loc, fmt, ap);
+	va_end(ap);
+}
+void error_tok(Token *token, char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	verror_at(token->loc, fmt, ap);
 	va_end(ap);
 }
 
@@ -77,13 +117,13 @@ static bool equal(Token *token, char *op) {
 
 static Token *skip(Token *tok, char *s) {
 	if (!equal(tok, s))
-		error("expected '%s'", s);
+		error_tok(tok, "expected '%s'", s);
 	return tok->next;
 }
 
 static unsigned int get_number(Token *tok) {
 	if (tok->kind != TK_NUM)
-		error("expected a number");
+		error_tok(tok, "expected a number");
 	return tok->val;
 }
 
@@ -134,7 +174,7 @@ static Token *tokenize(char *p) {
 			current = new_token(TK_PUNCT, p, p + 1);
 			++p;
 		} else {
-			error("invalid token %s", __FILE_NAME__);
+			error_at(p, "invalid token %s", __FILE_NAME__);
 			return 0;
 		}
 		print_token_type(*current);
@@ -157,13 +197,6 @@ static unsigned int EncodeLEB128(unsigned char *src, unsigned int value) {
 	*(src - 1) = byte;
 
 	return length;
-}
-
-char compile_text[1024] = {0};
-
-__attribute__((export_name("get_mem_addr")))
-char *get_mem_addr() {
-	return compile_text;
 }
 
 unsigned char compiled_code[1024] = {0};
