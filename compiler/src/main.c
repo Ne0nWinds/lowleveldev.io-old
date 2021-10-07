@@ -3,6 +3,7 @@
 #define is_digit(c) (c >= '0' && c <= '9')
 #define is_whitespace(c) (c == ' ' || c == '\r' || c == '\n' || c == '\t')
 #define len(arr) (sizeof(arr) / sizeof(arr[0]))
+#define is_punct(c) (c == '+' || c == '-' || c == '/' || c == '*' || c == '(' || c == ')')
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -40,6 +41,10 @@ int vprintf(const char *fmt, va_list ap) {
 				case '%': {
 					buffer[b++] = '%';
 				} break;
+				case 'd': {
+					int d = va_arg(ap, int);
+					buffer[b++] = d + '0';
+				} break;
 				default: {
 					return -1;
 				} break;
@@ -75,22 +80,56 @@ typedef enum {
 	TK_NUM,
 } TokenKind;
 
+typedef enum {
+	ND_ADD,
+	ND_SUB,
+	ND_MUL,
+	ND_DIV,
+	ND_NUM,
+} NodeKind;
+
+typedef struct Node Node;
+struct Node {
+	NodeKind kind;
+	Node *lhs;
+	Node *rhs;
+	int val;
+};
 typedef struct Token Token;
 struct Token {
 	TokenKind kind;
-	Token *next;
 	unsigned int val;
 	char *loc;
 	unsigned int len;
 };
 
-char compile_text[1024] = {0};
+Node AllNodes[512] = {0};
+Node *CurrentNode = AllNodes;
 
-__attribute__((export_name("get_mem_addr")))
-char *get_mem_addr() {
-	return compile_text;
+static Node *new_node(NodeKind kind) {
+	Node *node = CurrentNode++;
+	node->kind = kind;
+	return node;
+}
+static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
+	Node *node = new_node(kind);
+	node->lhs = lhs;
+	node->rhs = rhs;
+	return node;
+}
+static Node *new_num(int val) {
+	Node *node = new_node(ND_NUM);
+	node->val = val;
+	return node;
+}
+static bool equal(Token *token, char *op) {
+	for (unsigned int i = 0; i < token->len; ++i) {
+		if (token->loc[i] != op[i]) return 0;
+	}
+	return (op[token->len] == '\0');
 }
 
+static char compile_text[1024] = {0};
 static void verror_at(char *loc, char *fmt, va_list ap) {
 	int pos = loc - compile_text;
 	vprintf(fmt, ap);
@@ -107,18 +146,140 @@ void error_tok(Token *token, char *fmt, ...) {
 	verror_at(token->loc, fmt, ap);
 	va_end(ap);
 }
-
-static bool equal(Token *token, char *op) {
-	for (unsigned int i = 0; i < token->len; ++i) {
-		if (token->loc[i] != op[i]) return 0;
-	}
-	return (op[token->len] == '\0');
+void error(const char *str) {
+	print(str);
 }
+
+Token AllTokens[512] = {0};
+Token *CurrentToken = AllTokens;
 
 static Token *skip(Token *tok, char *s) {
 	if (!equal(tok, s))
 		error_tok(tok, "expected '%s'", s);
-	return tok->next;
+	return tok + 1;
+}
+
+static bool error_parsing = false;
+static Node *expr();
+static Node *mul();
+static Node *primary();
+
+static Node *expr() {
+	Node *node = mul();
+
+	for (;;) {
+		if (equal(CurrentToken, "+")) {
+			CurrentToken += 1;
+			node = new_binary(ND_ADD, node, mul());
+			continue;
+		}
+
+		if (equal(CurrentToken, "-")) {
+			CurrentToken += 1;
+			node = new_binary(ND_SUB, node, mul());
+			continue;
+		}
+
+		return node;
+	}
+}
+
+static Node *mul() {
+	Node *node = primary();
+
+	for (;;) {
+		if (equal(CurrentToken, "*")) {
+			CurrentToken += 1;
+			node = new_binary(ND_MUL, node, primary());
+			continue;
+		}
+
+		if (equal(CurrentToken, "/")) {
+			CurrentToken += 1;
+			node = new_binary(ND_DIV, node, primary());
+			continue;
+		}
+
+		return node;
+	}
+}
+
+static Node *primary() {
+	if (equal(CurrentToken, "(")) {
+		CurrentToken += 1;
+		Node *node = expr();
+		CurrentToken = skip(CurrentToken, ")");
+		return node;
+	}
+
+	if (CurrentToken->kind == TK_NUM) {
+		Node *node = new_num(CurrentToken->val);
+		CurrentToken += 1;
+		return node;
+	}
+
+	error_tok(CurrentToken, "expected an expression");
+	error_parsing = true;
+	return 0;
+}
+
+static unsigned char compiled_code[1024] = {0};
+static unsigned char *c = 0;
+unsigned int n_byte_length = 0;
+
+static unsigned int EncodeLEB128(unsigned char *src, unsigned int value) {
+	unsigned int length = 0;
+	unsigned char byte;
+	do {
+		byte = (value & 0x7F) | 0x80;
+		value >>= 7;
+		length += 1;
+		*src++ = byte;
+	} while (value || byte & 0x40);
+
+	byte &= 0x7F;
+	*(src - 1) = byte;
+
+	return length;
+}
+
+static void gen_expr(Node *node) {
+	if (node->kind == ND_NUM) {
+		c[n_byte_length++] = OP_I32_CONST;
+		n_byte_length += EncodeLEB128(c + n_byte_length, node->val);
+		print("OP_I32_CONST");
+		print_int(node->val);
+		return;
+	}
+	gen_expr(node->lhs);
+	gen_expr(node->rhs);
+
+	switch (node->kind) {
+		case ND_ADD: {
+			c[n_byte_length++] = OP_I32_ADD;
+			print("OP_I32_ADD");
+		} break;
+		case ND_SUB: {
+			c[n_byte_length++] = OP_I32_SUB;
+			print("OP_I32_SUB");
+		} break;
+		case ND_MUL: {
+			c[n_byte_length++] = OP_I32_MUL;
+			print("OP_I32_MUL");
+		} break;
+		case ND_DIV: {
+			c[n_byte_length++] = OP_I32_DIV_U;
+			print("OP_I32_DIV");
+		} break;
+		default: {
+			error("invalid expression");
+		}
+	}
+}
+
+__attribute__((export_name("get_mem_addr")))
+char *get_mem_addr() {
+	return compile_text;
 }
 
 static unsigned int get_number(Token *tok) {
@@ -134,9 +295,6 @@ static void print_token_type(Token t) {
 		case TK_NUM: print("TK_NUM"); break;
 	}
 }
-
-Token AllTokens[512] = {0};
-Token *CurrentToken = AllTokens;
 
 static Token *new_token(TokenKind kind, char *start, char *end) {
 	Token *tok = CurrentToken;
@@ -170,36 +328,17 @@ static Token *tokenize(char *p) {
 			char *q = p;
 			current->val = str_lu(p, &p);
 			current->len = p - q;
-		} else if (*p == '+' || *p == '-') {
+		} else if (is_punct(*p)) {
 			current = new_token(TK_PUNCT, p, p + 1);
 			++p;
 		} else {
 			error_at(p, "invalid token %s", __FILE_NAME__);
 			return 0;
 		}
-		print_token_type(*current);
 	}
 	current = new_token(TK_EOF, p, p);
 	return AllTokens;
 }
-
-static unsigned int EncodeLEB128(unsigned char *src, unsigned int value) {
-	unsigned int length = 0;
-	unsigned char byte;
-	do {
-		byte = (value & 0x7F) | 0x80;
-		value >>= 7;
-		length += 1;
-		*src++ = byte;
-	} while (value || byte & 0x40);
-
-	byte &= 0x7F;
-	*(src - 1) = byte;
-
-	return length;
-}
-
-unsigned char compiled_code[1024] = {0};
 
 static unsigned long WASM_header(unsigned char *c) {
 	c[0] = 0;
@@ -236,7 +375,7 @@ int get_int_byte_length(int n) {
 __attribute__((export_name("compile")))
 extern unsigned int compile() {
 
-	unsigned char *c = compiled_code;
+	c = compiled_code;
 
 	c += WASM_header(c);
 
@@ -271,28 +410,21 @@ extern unsigned int compile() {
 
 	char *ct = (char *)compile_text;
 
-	int n_byte_length = 0;
+	n_byte_length = 0;
 
 	if (!tokenize(ct)) return 0;
 
-	c[n_byte_length++] = OP_I32_CONST;
-	n_byte_length += EncodeLEB128(c + n_byte_length, get_number(AllTokens));
+	CurrentToken = AllTokens;
+	memset(AllNodes, 0, CurrentNode - AllNodes);
+	CurrentNode = AllNodes;
+	Node *node = expr();
 
-	for (unsigned int i = 1; AllTokens[i].kind; ++i) {
-		if (equal(AllTokens + i, "+")) {
-			print("PLUS");
-			c[n_byte_length++] = OP_I32_CONST;
-			++i;
-			n_byte_length += EncodeLEB128(c + n_byte_length, get_number(AllTokens + i));
-			c[n_byte_length++] = OP_I32_ADD;
-		} else if (equal(AllTokens + i, "-")) {
-			print("MINUS");
-			c[n_byte_length++] = OP_I32_CONST;
-			++i;
-			n_byte_length += EncodeLEB128(c + n_byte_length, get_number(AllTokens + i));
-			c[n_byte_length++] = OP_I32_SUB;
-		}
-	}
+	if (error_parsing) return 0;
+
+	if (CurrentToken->kind != TK_EOF)
+		error_tok(CurrentToken, "extra token");
+
+	gen_expr(node);
 
 	c[n_byte_length++] = OP_END;
 	c -= 5;
