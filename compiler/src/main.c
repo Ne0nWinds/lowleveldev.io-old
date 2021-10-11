@@ -85,6 +85,7 @@ typedef enum {
 	ND_SUB,
 	ND_MUL,
 	ND_DIV,
+	ND_NEG,
 	ND_NUM,
 } NodeKind;
 
@@ -115,6 +116,11 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
 	Node *node = new_node(kind);
 	node->lhs = lhs;
 	node->rhs = rhs;
+	return node;
+}
+static Node *new_unary(NodeKind kind, Node *expr) {
+	Node *node = new_node(kind);
+	node->lhs = expr;
 	return node;
 }
 static Node *new_num(int val) {
@@ -162,6 +168,7 @@ static Token *skip(Token *tok, char *s) {
 static bool error_parsing = false;
 static Node *expr();
 static Node *mul();
+static Node *unary();
 static Node *primary();
 
 static Node *expr() {
@@ -185,7 +192,7 @@ static Node *expr() {
 }
 
 static Node *mul() {
-	Node *node = primary();
+	Node *node = unary();
 
 	for (;;) {
 		if (equal(CurrentToken, "*")) {
@@ -202,6 +209,20 @@ static Node *mul() {
 
 		return node;
 	}
+}
+
+static Node *unary() {
+	if (equal(CurrentToken, "+")) {
+		CurrentToken += 1;
+		return unary();
+	}
+
+	if (equal(CurrentToken, "-")) {
+		CurrentToken += 1;
+		return new_unary(ND_NEG, unary());
+	}
+
+	return primary();
 }
 
 static Node *primary() {
@@ -227,29 +248,39 @@ static unsigned char compiled_code[1024] = {0};
 static unsigned char *c = 0;
 unsigned int n_byte_length = 0;
 
-static unsigned int EncodeLEB128(unsigned char *src, unsigned int value) {
-	unsigned int length = 0;
-	unsigned char byte;
-	do {
-		byte = (value & 0x7F) | 0x80;
-		value >>= 7;
-		length += 1;
-		*src++ = byte;
-	} while (value || byte & 0x40);
-
-	byte &= 0x7F;
-	*(src - 1) = byte;
-
-	return length;
+#define EncodeLEB128(writeable, x, n_byte_length) {\
+	typeof(x) value = x;\
+	unsigned char *src = writeable;\
+	unsigned char byte;\
+	do {\
+		byte = (value & 0x7F) | 0x80;\
+		value >>= 7;\
+		n_byte_length += 1;\
+		*(src)++ = byte;\
+	} while ((value && !(byte & 0x40)) || (value != -1 && (byte & 0x40)));\
+	byte &= 0x7F;\
+	*(src - 1) = byte;\
 }
 
 static void gen_expr(Node *node) {
-	if (node->kind == ND_NUM) {
-		c[n_byte_length++] = OP_I32_CONST;
-		n_byte_length += EncodeLEB128(c + n_byte_length, node->val);
-		print("OP_I32_CONST");
-		print_int(node->val);
-		return;
+	switch (node->kind) {
+		case ND_NUM: {
+			c[n_byte_length++] = OP_I32_CONST;
+			EncodeLEB128(c + n_byte_length, node->val, n_byte_length);
+			print("OP_I32_CONST");
+			print_int(node->val);
+			return;
+		} break;
+		case ND_NEG: {
+			gen_expr(node->lhs);
+			c[n_byte_length++] = OP_I32_CONST;
+			EncodeLEB128(c + n_byte_length, -1, n_byte_length);
+			print("OP_I32_CONST");
+			print_int(-1);
+			c[n_byte_length++] = OP_I32_MUL;
+			print("OP_I32_MUL");
+			return;
+		}
 	}
 	gen_expr(node->lhs);
 	gen_expr(node->rhs);
@@ -412,6 +443,7 @@ extern unsigned int compile() {
 
 	n_byte_length = 0;
 
+	error_parsing = false;
 	if (!tokenize(ct)) return 0;
 
 	CurrentToken = AllTokens;
