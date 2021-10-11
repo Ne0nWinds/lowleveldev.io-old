@@ -164,6 +164,13 @@ static Token *skip(Token *tok, char *s) {
 		error_tok(tok, "expected '%s'", s);
 	return tok + 1;
 }
+static void print_token_type(Token t) {
+	switch (t.kind) {
+		case TK_EOF: print("TK_EOF"); break;
+		case TK_PUNCT: print("TK_PUNCT"); break;
+		case TK_NUM: print("TK_NUM"); break;
+	}
+}
 
 static bool error_parsing = false;
 static Node *expr();
@@ -197,13 +204,13 @@ static Node *mul() {
 	for (;;) {
 		if (equal(CurrentToken, "*")) {
 			CurrentToken += 1;
-			node = new_binary(ND_MUL, node, primary());
+			node = new_binary(ND_MUL, node, unary());
 			continue;
 		}
 
 		if (equal(CurrentToken, "/")) {
 			CurrentToken += 1;
-			node = new_binary(ND_DIV, node, primary());
+			node = new_binary(ND_DIV, node, unary());
 			continue;
 		}
 
@@ -319,14 +326,6 @@ static unsigned int get_number(Token *tok) {
 	return tok->val;
 }
 
-static void print_token_type(Token t) {
-	switch (t.kind) {
-		case TK_EOF: print("TK_EOF"); break;
-		case TK_PUNCT: print("TK_PUNCT"); break;
-		case TK_NUM: print("TK_NUM"); break;
-	}
-}
-
 static Token *new_token(TokenKind kind, char *start, char *end) {
 	Token *tok = CurrentToken;
 	CurrentToken += 1;
@@ -348,11 +347,15 @@ unsigned int str_lu(char *str, char **end) {
 }
 
 static Token *tokenize(char *p) {
+	memset(AllTokens, 0, sizeof(AllTokens));
 	CurrentToken = AllTokens;
 	Token *current = 0;
 
 	while (*p) {
-		while (is_whitespace(*p)) p += 1;
+		if (is_whitespace(*p)) {
+			p += 1;
+			continue;
+		}
 
 		if (is_digit(*p)) {
 			current = new_token(TK_NUM, p, p);
