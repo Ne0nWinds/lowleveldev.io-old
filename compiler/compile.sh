@@ -1,7 +1,2 @@
-clang \
--O3 \
---target=wasm32 \
--nostdlib \
--Wl,--no-entry,--allow-undefined-file=imports.sym \
--o binary.wasm \
-src/main.c
+# not working?
+clang-12 -O3 --target=wasm32 -msimd128 -nostdlib "-Wl,--no-entry,--allow-undefined-file=imports.sym" -o binary.wasm src/main.c

@@ -1,4 +1,5 @@
 #include "WebAssemblyConstants.h"
+#include <wasm_simd128.h>
 
 #define is_digit(c) (c >= '0' && c <= '9')
 #define is_whitespace(c) (c == ' ' || c == '\r' || c == '\n' || c == '\t')
@@ -7,15 +8,30 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
+
 // clang generates seems to expect memset/memcpy to be defined like this?
+__attribute__((always_inline))
 void *memset(void *str, int c, unsigned int n) {
-	for (unsigned int i = 0; i < n; ++i) {
+	v128_t c_vectorized = wasm_i8x16_splat(c);
+
+	unsigned int i = 0;
+	for (;i < n; i += 16) {
+		wasm_v128_store(str + i, c_vectorized);
+	}
+
+	for (; i < n; ++i) {
 		((unsigned char *)str)[i] = c;
 	}
+
 	return str;
 }
 void *memcpy(void *dest, const void *src, unsigned int n) {
-	for (unsigned int i = 0; i < n; ++i) {
+	unsigned int i = 0;
+	for (; i < n; i += 16) {
+		v128_t src_vec = wasm_v128_load(src + i);
+		wasm_v128_store(dest + i, src_vec);
+	}
+	for (; i < n; ++i) {
 		((unsigned char *)dest)[i] = ((unsigned char *)src)[i];
 	}
 	return dest;
