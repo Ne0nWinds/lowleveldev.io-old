@@ -25,6 +25,16 @@ unsigned int strlen(const char *str) {
 	while (*str++) ++n;
 	return n;
 }
+
+bool startswith(const char *p, const char *q) {
+	while (*q) {
+		if (*q != *p) return false;
+		q += 1;
+		p += 1;
+	}
+	return true;
+}
+
 int vprintf(const char *fmt, va_list ap) {
 	static char buffer[512] = {0};
 	unsigned int b = 0;
@@ -74,6 +84,13 @@ void print_uint(unsigned int s) {
 	_print(s, 0);
 }
 
+static int read_punct(char *p) {
+	if (startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
+		return 2;
+	}
+	return is_punct(*p);
+}
+
 typedef enum {
 	TK_EOF = 0,
 	TK_PUNCT,
@@ -87,6 +104,10 @@ typedef enum {
 	ND_DIV,
 	ND_NEG,
 	ND_NUM,
+	ND_EQ,
+	ND_NE,
+	ND_LT,
+	ND_LE,
 } NodeKind;
 
 typedef struct Node Node;
@@ -178,7 +199,15 @@ static Node *mul();
 static Node *unary();
 static Node *primary();
 
+static Node *equality();
+static Node *relational();
+static Node *add();
+
 static Node *expr() {
+	return equality();
+}
+
+static Node *add() {
 	Node *node = mul();
 
 	for (;;) {
@@ -191,6 +220,55 @@ static Node *expr() {
 		if (equal(CurrentToken, "-")) {
 			CurrentToken += 1;
 			node = new_binary(ND_SUB, node, mul());
+			continue;
+		}
+
+		return node;
+	}
+}
+
+static Node *equality() {
+	Node *node = relational();
+
+	for (;;) {
+		if (equal(CurrentToken, "==")) {
+			CurrentToken += 1;
+			node = new_binary(ND_EQ, node, relational());
+			continue;
+		}
+
+		if (equal(CurrentToken, "!=")) {
+			CurrentToken += 1;
+			node = new_binary(ND_NE, node, relational());
+			continue;
+		}
+
+		return node;
+	}
+}
+
+static Node *relational() {
+	Node *node = add();
+
+	for (;;) {
+		if (equal(CurrentToken, "<")) {
+			CurrentToken += 1;
+			node = new_binary(ND_LT, node, add());
+			continue;
+		}
+		if (equal(CurrentToken, "<=")) {
+			CurrentToken += 1;
+			node = new_binary(ND_LE, node, add());
+			continue;
+		}
+		if (equal(CurrentToken, ">")) {
+			CurrentToken += 1;
+			node = new_binary(ND_LT, node, add());
+			continue;
+		}
+		if (equal(CurrentToken, ">=")) {
+			CurrentToken += 1;
+			node = new_binary(ND_LE, node, add());
 			continue;
 		}
 
@@ -309,6 +387,22 @@ static void gen_expr(Node *node) {
 			c[n_byte_length++] = OP_I32_DIV_U;
 			print("OP_I32_DIV");
 		} break;
+		case ND_EQ: {
+			c[n_byte_length++] = OP_I32_EQ;
+			print("OP_I32_EQ");
+		} break;
+		case ND_NE: {
+			c[n_byte_length++] = OP_I32_NE;
+			print("OP_I32_NE");
+		} break;
+		case ND_LT: {
+			c[n_byte_length++] = OP_I32_LT_S;
+			print("OP_I32_LT");
+		} break;
+		case ND_LE: {
+			c[n_byte_length++] = OP_I32_LE_S;
+			print("OP_I32_LE");
+		} break;
 		default: {
 			error("invalid expression");
 		}
@@ -332,6 +426,7 @@ static Token *new_token(TokenKind kind, char *start, char *end) {
 	tok->kind = kind;
 	tok->loc = start;
 	tok->len = end - start;
+	print_token_type(*tok);
 	return tok;
 }
 
@@ -362,13 +457,18 @@ static Token *tokenize(char *p) {
 			char *q = p;
 			current->val = str_lu(p, &p);
 			current->len = p - q;
-		} else if (is_punct(*p)) {
-			current = new_token(TK_PUNCT, p, p + 1);
-			++p;
-		} else {
-			error_at(p, "invalid token %s", __FILE_NAME__);
-			return 0;
+			continue;
 		}
+
+		int punct_len = read_punct(p);
+		if (punct_len) {
+			current = new_token(TK_PUNCT, p, p + punct_len);
+			p += punct_len;
+			continue;
+		}
+
+		error_at(p, "invalid token %s", __FILE_NAME__);
+		return 0;
 	}
 	current = new_token(TK_EOF, p, p);
 	return AllTokens;
@@ -450,7 +550,7 @@ extern unsigned int compile() {
 	if (!tokenize(ct)) return 0;
 
 	CurrentToken = AllTokens;
-	memset(AllNodes, 0, CurrentNode - AllNodes);
+	memset(AllNodes, 0, sizeof(AllNodes));
 	CurrentNode = AllNodes;
 	Node *node = expr();
 

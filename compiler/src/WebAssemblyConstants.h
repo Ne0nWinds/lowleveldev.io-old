@@ -33,6 +33,17 @@ enum OpCode {
 
 	OP_I32_CONST = 0x41,
 
+	OP_I32_EQ = 0x46,
+	OP_I32_NE = 0x47,
+	OP_I32_LT_S = 0x48,
+	OP_I32_LT_U = 0x49,
+	OP_I32_GT_S = 0x4a,
+	OP_I32_GT_U = 0x4b,
+	OP_I32_LE_S = 0x4c,
+	OP_I32_LE_U = 0x4d,
+	OP_I32_GE_S = 0x4e,
+	OP_I32_GE_U = 0x4f,
+
 	OP_I32_ADD = 0x6A,
 	OP_I32_SUB = 0x6B,
 	OP_I32_MUL = 0x6C,
