@@ -124,12 +124,12 @@ static Node *relational() {
 		}
 		if (equal(CurrentToken(), ">")) {
 			NextToken();
-			node = new_binary(ND_LT, node, add());
+			node = new_binary(ND_GT, node, add());
 			continue;
 		}
 		if (equal(CurrentToken(), ">=")) {
 			NextToken();
-			node = new_binary(ND_LE, node, add());
+			node = new_binary(ND_GE, node, add());
 			continue;
 		}
 
@@ -262,6 +262,14 @@ static void _gen_expr(Node *node) {
 		case ND_LE: {
 			c[n_byte_length++] = OP_I32_LE_S;
 			print("OP_I32_LE");
+		} break;
+		case ND_GT: {
+			c[n_byte_length++] = OP_I32_GT_S;
+			print("OP_I32_GT");
+		} break;
+		case ND_GE: {
+			c[n_byte_length++] = OP_I32_GE_S;
+			print("OP_I32_GE");
 		} break;
 		default: {
 			error("invalid expression");
