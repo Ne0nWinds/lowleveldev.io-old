@@ -1,17 +1,6 @@
 #include "defines.h"
-
-static int read_punct(char *p) {
-	if (startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
-		return 2;
-	}
-	return is_punct(*p);
-}
-
-typedef enum {
-	TK_EOF = 0,
-	TK_PUNCT,
-	TK_NUM,
-} TokenKind;
+#include "tokenize.h"
+#include "standard_functions.h"
 
 typedef enum {
 	ND_ADD,
@@ -32,13 +21,6 @@ struct Node {
 	Node *lhs;
 	Node *rhs;
 	int val;
-};
-typedef struct Token Token;
-struct Token {
-	TokenKind kind;
-	unsigned int val;
-	char *loc;
-	unsigned int len;
 };
 
 Node AllNodes[512] = {0};
@@ -65,7 +47,7 @@ static Node *new_num(int val) {
 	node->val = val;
 	return node;
 }
-static bool equal(Token *token, char *op) {
+static bool equal(const Token *token, char *op) {
 	for (unsigned int i = 0; i < token->len; ++i) {
 		if (token->loc[i] != op[i]) return 0;
 	}
@@ -73,40 +55,12 @@ static bool equal(Token *token, char *op) {
 }
 
 static char compile_text[1024] = {0};
-static void verror_at(char *loc, char *fmt, va_list ap) {
-	int pos = loc - compile_text;
-	vprintf(fmt, ap);
-}
-static void error_at(char *loc, char *fmt, ...) {
-	va_list ap;
-	va_start(ap, fmt);
-	verror_at(loc, fmt, ap);
-	va_end(ap);
-}
-void error_tok(Token *token, char *fmt, ...) {
-	va_list ap;
-	va_start(ap, fmt);
-	verror_at(token->loc, fmt, ap);
-	va_end(ap);
-}
-void error(const char *str) {
-	print(str);
-}
 
-Token AllTokens[512] = {0};
-Token *CurrentToken = AllTokens;
-
-static Token *skip(Token *tok, char *s) {
+void skip(char *s) {
+	const Token *tok = CurrentToken();
 	if (!equal(tok, s))
 		error_tok(tok, "expected '%s'", s);
-	return tok + 1;
-}
-static void print_token_type(Token t) {
-	switch (t.kind) {
-		case TK_EOF: print("TK_EOF"); break;
-		case TK_PUNCT: print("TK_PUNCT"); break;
-		case TK_NUM: print("TK_NUM"); break;
-	}
+	NextToken();
 }
 
 static bool error_parsing = false;
@@ -127,14 +81,14 @@ static Node *add() {
 	Node *node = mul();
 
 	for (;;) {
-		if (equal(CurrentToken, "+")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "+")) {
+			NextToken();
 			node = new_binary(ND_ADD, node, mul());
 			continue;
 		}
 
-		if (equal(CurrentToken, "-")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "-")) {
+			NextToken();
 			node = new_binary(ND_SUB, node, mul());
 			continue;
 		}
@@ -147,14 +101,14 @@ static Node *equality() {
 	Node *node = relational();
 
 	for (;;) {
-		if (equal(CurrentToken, "==")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "==")) {
+			NextToken();
 			node = new_binary(ND_EQ, node, relational());
 			continue;
 		}
 
-		if (equal(CurrentToken, "!=")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "!=")) {
+			NextToken();
 			node = new_binary(ND_NE, node, relational());
 			continue;
 		}
@@ -167,23 +121,23 @@ static Node *relational() {
 	Node *node = add();
 
 	for (;;) {
-		if (equal(CurrentToken, "<")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "<")) {
+			NextToken();
 			node = new_binary(ND_LT, node, add());
 			continue;
 		}
-		if (equal(CurrentToken, "<=")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "<=")) {
+			NextToken();
 			node = new_binary(ND_LE, node, add());
 			continue;
 		}
-		if (equal(CurrentToken, ">")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), ">")) {
+			NextToken();
 			node = new_binary(ND_LT, node, add());
 			continue;
 		}
-		if (equal(CurrentToken, ">=")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), ">=")) {
+			NextToken();
 			node = new_binary(ND_LE, node, add());
 			continue;
 		}
@@ -196,14 +150,14 @@ static Node *mul() {
 	Node *node = unary();
 
 	for (;;) {
-		if (equal(CurrentToken, "*")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "*")) {
+			NextToken();
 			node = new_binary(ND_MUL, node, unary());
 			continue;
 		}
 
-		if (equal(CurrentToken, "/")) {
-			CurrentToken += 1;
+		if (equal(CurrentToken(), "/")) {
+			NextToken();
 			node = new_binary(ND_DIV, node, unary());
 			continue;
 		}
@@ -213,13 +167,13 @@ static Node *mul() {
 }
 
 static Node *unary() {
-	if (equal(CurrentToken, "+")) {
-		CurrentToken += 1;
+	if (equal(CurrentToken(), "+")) {
+		NextToken();
 		return unary();
 	}
 
-	if (equal(CurrentToken, "-")) {
-		CurrentToken += 1;
+	if (equal(CurrentToken(), "-")) {
+		NextToken();
 		return new_unary(ND_NEG, unary());
 	}
 
@@ -227,20 +181,20 @@ static Node *unary() {
 }
 
 static Node *primary() {
-	if (equal(CurrentToken, "(")) {
-		CurrentToken += 1;
+	if (equal(CurrentToken(), "(")) {
+		NextToken();
 		Node *node = expr();
-		CurrentToken = skip(CurrentToken, ")");
+		skip(")");
 		return node;
 	}
 
-	if (CurrentToken->kind == TK_NUM) {
-		Node *node = new_num(CurrentToken->val);
-		CurrentToken += 1;
+	if (CurrentToken()->kind == TK_NUM) {
+		Node *node = new_num(CurrentToken()->val);
+		NextToken();
 		return node;
 	}
 
-	error_tok(CurrentToken, "expected an expression");
+	error_tok(CurrentToken(), "expected an expression");
 	error_parsing = true;
 	return 0;
 }
@@ -336,49 +290,6 @@ static unsigned int get_number(Token *tok) {
 	return tok->val;
 }
 
-static Token *new_token(TokenKind kind, char *start, char *end) {
-	Token *tok = CurrentToken;
-	CurrentToken += 1;
-	tok->kind = kind;
-	tok->loc = start;
-	tok->len = end - start;
-	print_token_type(*tok);
-	return tok;
-}
-
-static Token *tokenize(char *p) {
-	memset(AllTokens, 0, sizeof(AllTokens));
-	CurrentToken = AllTokens;
-	Token *current = 0;
-
-	while (*p) {
-		if (is_whitespace(*p)) {
-			p += 1;
-			continue;
-		}
-
-		if (is_digit(*p)) {
-			current = new_token(TK_NUM, p, p);
-			char *q = p;
-			current->val = str_lu(p, &p);
-			current->len = p - q;
-			continue;
-		}
-
-		int punct_len = read_punct(p);
-		if (punct_len) {
-			current = new_token(TK_PUNCT, p, p + punct_len);
-			p += punct_len;
-			continue;
-		}
-
-		error_at(p, "invalid token %s", __FILE_NAME__);
-		return 0;
-	}
-	current = new_token(TK_EOF, p, p);
-	return AllTokens;
-}
-
 static unsigned long WASM_header(unsigned char *c) {
 	c[0] = 0;
 	c[1] = 'a';
@@ -447,15 +358,15 @@ extern unsigned int compile() {
 	error_parsing = false;
 	if (!tokenize(ct)) return 0;
 
-	CurrentToken = AllTokens;
+	ResetCurrentToken();
 	memset(AllNodes, 0, sizeof(AllNodes));
 	CurrentNode = AllNodes;
 	Node *node = expr();
 
 	if (error_parsing) return 0;
 
-	if (CurrentToken->kind != TK_EOF)
-		error_tok(CurrentToken, "extra token");
+	if (CurrentToken()->kind != TK_EOF)
+		error_tok(CurrentToken(), "extra token");
 
 	gen_expr(node);
 
