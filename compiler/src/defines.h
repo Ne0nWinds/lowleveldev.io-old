@@ -19,6 +19,7 @@ int printf(const char *fmt, ...);
 void print(const char *src);
 void print_int(int s);
 void print_uint(unsigned int s);
+unsigned int str_lu(char *str, char **end);
 
 __attribute__((always_inline))
 void *memset(void *str, int c, unsigned int n) {
@@ -112,4 +113,15 @@ void print_int(int s) {
 
 void print_uint(unsigned int s) {
 	_print(s, 0);
+}
+
+unsigned int str_lu(char *str, char **end) {
+	unsigned int num = 0;
+	while (*str >= '0' && *str <= '9') {
+		num *= 10;
+		num += *str - '0';
+		str += 1;
+		*end += 1;
+	}
+	return num;
 }

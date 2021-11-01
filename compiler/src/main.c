@@ -346,17 +346,6 @@ static Token *new_token(TokenKind kind, char *start, char *end) {
 	return tok;
 }
 
-unsigned int str_lu(char *str, char **end) {
-	unsigned int num = 0;
-	while (*str >= '0' && *str <= '9') {
-		num *= 10;
-		num += *str - '0';
-		str += 1;
-		*end += 1;
-	}
-	return num;
-}
-
 static Token *tokenize(char *p) {
 	memset(AllTokens, 0, sizeof(AllTokens));
 	CurrentToken = AllTokens;
