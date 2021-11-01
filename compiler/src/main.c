@@ -1,104 +1,4 @@
-#include "WebAssemblyConstants.h"
-#include <wasm_simd128.h>
-
-#define is_digit(c) (c >= '0' && c <= '9')
-#define is_whitespace(c) (c == ' ' || c == '\r' || c == '\n' || c == '\t')
-#define len(arr) (sizeof(arr) / sizeof(arr[0]))
-#define is_punct(c) (c == '+' || c == '-' || c == '/' || c == '*' || c == '(' || c == ')' || c == '>' || c == '<')
-
-#include <stdarg.h>
-#include <stdbool.h>
-
-// clang generates seems to expect memset/memcpy to be defined like this?
-__attribute__((always_inline))
-void *memset(void *str, int c, unsigned int n) {
-	v128_t c_vectorized = wasm_i8x16_splat(c);
-
-	unsigned int i = 0;
-	for (;i < n; i += 16) {
-		wasm_v128_store(str + i, c_vectorized);
-	}
-
-	for (; i < n; ++i) {
-		((unsigned char *)str)[i] = c;
-	}
-
-	return str;
-}
-void *memcpy(void *dest, const void *src, unsigned int n) {
-	unsigned int i = 0;
-	for (; i < n; i += 16) {
-		v128_t src_vec = wasm_v128_load(src + i);
-		wasm_v128_store(dest + i, src_vec);
-	}
-	for (; i < n; ++i) {
-		((unsigned char *)dest)[i] = ((unsigned char *)src)[i];
-	}
-	return dest;
-}
-unsigned int strlen(const char *str) {
-	unsigned int n = 0;
-	while (*str++) ++n;
-	return n;
-}
-
-bool startswith(const char *p, const char *q) {
-	while (*q) {
-		if (*q != *p) return false;
-		q += 1;
-		p += 1;
-	}
-	return true;
-}
-
-int vprintf(const char *fmt, va_list ap) {
-	static char buffer[512] = {0};
-	unsigned int b = 0;
-	for (unsigned int f = 0; fmt[f] && f < len(buffer); ++f) {
-		if (fmt[f] != '%') {
-			buffer[b++] = fmt[f];
-		} else {
-			f += 1;
-			switch (fmt[f]) {
-				case 's': {
-					const char *str = va_arg(ap, const char *);
-					while (*str) buffer[b++] = *str++;
-				} break;
-				case '%': {
-					buffer[b++] = '%';
-				} break;
-				case 'd': {
-					int d = va_arg(ap, int);
-					buffer[b++] = d + '0';
-				} break;
-				default: {
-					return -1;
-				} break;
-			}
-		}
-	}
-	_print(buffer, b);
-	return b;
-}
-int printf(const char *fmt, ...) {
-	va_list ap;
-	va_start(ap, fmt);
-	int b = vprintf(fmt, ap);
-	va_end(ap);
-	return b;
-}
-
-void print(const char *src) {
-	unsigned int i = 0;
-	while (src[i] != 0) ++i;
-	_print(src, i);
-}
-void print_int(int s) {
-	_print(s, 0);
-}
-void print_uint(unsigned int s) {
-	_print(s, 0);
-}
+#include "defines.h"
 
 static int read_punct(char *p) {
 	if (startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=")) {
@@ -513,13 +413,6 @@ int atoi(char **str) {
 	}
 	if (is_negative) num *= -1;
 	return num;
-}
-
-int get_int_byte_length(int n) {
-	if (n & 0xFF000000) return 4;
-	if (n & 0x00FF0000) return 3;
-	if (n & 0x0000FF00) return 2;
-	return 1;
 }
 
 __attribute__((export_name("compile")))
