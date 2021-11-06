@@ -31,6 +31,8 @@ enum OpCode {
 	OP_GET_LOCAL = 0x20,
 	OP_F32_ADD = 0x92,
 
+	OP_DROP = 0x1A,
+
 	OP_I32_CONST = 0x41,
 
 	OP_I32_EQ = 0x46,

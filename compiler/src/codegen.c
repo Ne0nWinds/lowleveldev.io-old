@@ -322,7 +322,11 @@ void gen_expr(Node *node, unsigned int *byte_length, unsigned char *output_code)
 	n_byte_length = *byte_length;
 	c = output_code;
 	for (Node *n = node; n && n->kind == ND_EXPR; n = n->next) {
-		_gen_expr(node->lhs);
+		_gen_expr(n->lhs);
+		if (n->next) {
+			print("OP_DROP");
+			c[n_byte_length++] = OP_DROP;
+		}
 	}
 	*byte_length = n_byte_length;
 }
