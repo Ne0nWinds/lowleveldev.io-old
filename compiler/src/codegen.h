@@ -13,11 +13,13 @@ typedef enum {
 	ND_LE,
 	ND_GT,
 	ND_GE,
+	ND_EXPR
 } NodeKind;
 
 typedef struct Node Node;
 struct Node {
 	NodeKind kind;
+	Node *next;
 	Node *lhs;
 	Node *rhs;
 	int val;

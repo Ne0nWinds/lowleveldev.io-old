@@ -59,16 +59,24 @@ Node *ParseTokens() {
 	ResetCurrentToken();
 	error_parsing = false;
 	memset(AllNodes, 0, sizeof(AllNodes));
-	CurrentNode = AllNodes;
-	Node *node = expr();
-	return (!error_parsing) ? node : 0;
+	Node *head = AllNodes;
+	CurrentNode = head;
+	while (CurrentToken()->kind && !error_parsing) {
+		CurrentNode->next = expr();
+		CurrentNode = CurrentNode->next;
+	}
+	return (error_parsing) ? head->next : 0;
 }
 
 static Node *expr() {
-	return equality();
+	print(__FUNCTION__);
+	Node *node = new_unary(ND_EXPR, equality());
+	skip(";");
+	return node;
 }
 
 static Node *add() {
+	print(__FUNCTION__);
 	Node *node = mul();
 
 	for (;;) {
@@ -89,6 +97,7 @@ static Node *add() {
 }
 
 static Node *equality() {
+	print(__FUNCTION__);
 	Node *node = relational();
 
 	for (;;) {
@@ -109,6 +118,7 @@ static Node *equality() {
 }
 
 static Node *relational() {
+	print(__FUNCTION__);
 	Node *node = add();
 
 	for (;;) {
@@ -138,6 +148,7 @@ static Node *relational() {
 }
 
 static Node *mul() {
+	print(__FUNCTION__);
 	Node *node = unary();
 
 	for (;;) {
@@ -158,6 +169,7 @@ static Node *mul() {
 }
 
 static Node *unary() {
+	print(__FUNCTION__);
 	if (equal(CurrentToken(), "+")) {
 		NextToken();
 		return unary();
@@ -172,6 +184,7 @@ static Node *unary() {
 }
 
 static Node *primary() {
+	print(__FUNCTION__);
 	if (equal(CurrentToken(), "(")) {
 		NextToken();
 		Node *node = expr();
