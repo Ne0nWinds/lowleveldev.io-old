@@ -84,6 +84,7 @@ static Node *add() {
 	for (;;) {
 		if (equal(CurrentToken(), "+")) {
 			NextToken();
+			print("hit -- add");
 			node = new_binary(ND_ADD, node, mul());
 			continue;
 		}
