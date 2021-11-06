@@ -231,10 +231,17 @@ static char *NodeKind_str[] = {
 	"ND_EXPR"
 };
 
-void print_tree(Node *node) {
+static void _print_tree(Node *node) {
 	print(NodeKind_str[node->kind]);
 	if (node->lhs) print_tree(node->lhs);
 	if (node->rhs) print_tree(node->rhs);
+}
+
+void print_tree(Node *node) {
+	while (node) {
+		_print_tree(node);
+		node = node->next;
+	}
 }
 
 static unsigned int n_byte_length;
@@ -306,6 +313,7 @@ static void _gen_expr(Node *node) {
 		} break;
 		default: {
 			error("invalid expression");
+			return;
 		}
 	}
 }
@@ -313,6 +321,8 @@ static void _gen_expr(Node *node) {
 void gen_expr(Node *node, unsigned int *byte_length, unsigned char *output_code) {
 	n_byte_length = *byte_length;
 	c = output_code;
-	_gen_expr(node);
+	for (Node *n = node; n && n->kind == ND_EXPR; n = n->next) {
+		_gen_expr(node->lhs);
+	}
 	*byte_length = n_byte_length;
 }
