@@ -75,13 +75,19 @@ extern unsigned int compile() {
 	if (!tokenize(ct)) return 0;
 
 	Node *node = ParseTokens();
+	while (node) {
+		print_tree(node);
+		node = node->next;
+	}
 
+	print("hit 1");
 	if (!node) return 0;
+	print("hit 2");
 
 	if (CurrentToken()->kind != TK_EOF)
 		error_tok(CurrentToken(), "extra token");
 
-	gen_expr(node, &n_byte_length, c);
+	// gen_expr(node, &n_byte_length, c);
 
 	c[n_byte_length++] = OP_END;
 	c -= 5;

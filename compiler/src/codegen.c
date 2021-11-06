@@ -47,6 +47,7 @@ void skip(char *s) {
 
 Node *ParseTokens();
 static Node *expr();
+static Node *new_expr();
 static Node *mul();
 static Node *unary();
 static Node *primary();
@@ -59,29 +60,31 @@ Node *ParseTokens() {
 	ResetCurrentToken();
 	error_parsing = false;
 	memset(AllNodes, 0, sizeof(AllNodes));
-	Node *head = AllNodes;
-	CurrentNode = head;
+	Node *head = new_expr();
+	Node *LocalCurrent = head;
 	while (CurrentToken()->kind && !error_parsing) {
-		CurrentNode->next = expr();
-		CurrentNode = CurrentNode->next;
+		LocalCurrent->next = new_expr();
+		LocalCurrent = LocalCurrent->next;
 	}
-	return (error_parsing) ? head->next : 0;
+	return (!error_parsing) ? head : 0;
 }
-
-static Node *expr() {
-	print(__FUNCTION__);
-	Node *node = new_unary(ND_EXPR, equality());
+static Node *new_expr() {
+	Node *node = new_unary(ND_EXPR, expr());
 	skip(";");
 	return node;
 }
 
+static Node *expr() {
+	return equality();
+}
+
 static Node *add() {
-	print(__FUNCTION__);
 	Node *node = mul();
 
 	for (;;) {
 		if (equal(CurrentToken(), "+")) {
 			NextToken();
+			print("hit -- add");
 			node = new_binary(ND_ADD, node, mul());
 			continue;
 		}
@@ -97,7 +100,6 @@ static Node *add() {
 }
 
 static Node *equality() {
-	print(__FUNCTION__);
 	Node *node = relational();
 
 	for (;;) {
@@ -118,7 +120,6 @@ static Node *equality() {
 }
 
 static Node *relational() {
-	print(__FUNCTION__);
 	Node *node = add();
 
 	for (;;) {
@@ -148,7 +149,6 @@ static Node *relational() {
 }
 
 static Node *mul() {
-	print(__FUNCTION__);
 	Node *node = unary();
 
 	for (;;) {
@@ -169,7 +169,6 @@ static Node *mul() {
 }
 
 static Node *unary() {
-	print(__FUNCTION__);
 	if (equal(CurrentToken(), "+")) {
 		NextToken();
 		return unary();
@@ -184,7 +183,6 @@ static Node *unary() {
 }
 
 static Node *primary() {
-	print(__FUNCTION__);
 	if (equal(CurrentToken(), "(")) {
 		NextToken();
 		Node *node = expr();
@@ -215,6 +213,28 @@ static Node *primary() {
 	} while ((value && !(byte & 0x40)) || (value != -1 && (byte & 0x40)));\
 	byte &= 0x7F;\
 	*(src - 1) = byte;\
+}
+
+static char *NodeKind_str[] = {
+	"ND_ADD",
+	"ND_SUB",
+	"ND_MUL",
+	"ND_DIV",
+	"ND_NEG",
+	"ND_NUM",
+	"ND_EQ",
+	"ND_NE",
+	"ND_LT",
+	"ND_LE",
+	"ND_GT",
+	"ND_GE",
+	"ND_EXPR"
+};
+
+void print_tree(Node *node) {
+	print(NodeKind_str[node->kind]);
+	if (node->lhs) print_tree(node->lhs);
+	if (node->rhs) print_tree(node->rhs);
 }
 
 static unsigned int n_byte_length;

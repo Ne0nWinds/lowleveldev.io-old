@@ -27,3 +27,4 @@ struct Node {
 
 void gen_expr(Node *node, unsigned int *byte_length, unsigned char *c);
 Node *ParseTokens();
+void print_tree(Node *node);
