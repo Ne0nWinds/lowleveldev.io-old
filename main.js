@@ -9,22 +9,23 @@ editor.oninput = () => {
 }
 
 const test_cases = [
-	['0', 0],
-	['42', 42],
-	['5+20-4', 21],
-	[' 12     + 34   - 5', 41],
-	['5+6*7', 47],
-	['-10+20', 10],
-	['- -10', 10],
-	['- - +10', 10],
-	['27 == 27', 1],
-	['1 != 32', 0],
-	['2 * 50   >=    200 / 2   ', 1],
-	['2 > 1', 1],
-	['(2 > 1) * 8 \n', 8],
-	['- 1 == - 1', 1],
-	['0 >= - 1', 1],
-	['-1 > -129', 1],
+	['0;', 0],
+	['42;', 42],
+	['5+20-4;', 21],
+	[' 12     + 34   - 5;', 41],
+	['5+6*7;', 47],
+	['-10+20;', 10],
+	['- -10;', 10],
+	['- - +10;', 10],
+	['27 == 27;', 1],
+	['1 != 32;', 1],
+	['2 * 50   >=    200 / 2   ;', 1],
+	['2 > 1;', 1],
+	['(2 > 1) * 8 \n;', 8],
+	['- 1 == - 1;', 1],
+	['0 >= - 1;', 1],
+	['-1 > -129;', 1],
+	['1; 2;', 2],
 ];
 
 async function compile(value) {
@@ -51,12 +52,21 @@ async function compile(value) {
 }
 
 void async function() {
-	for (let i = 0; i < test_cases.length; ++i) {
-		if (await compile(test_cases[i][0]) != test_cases[i][1]) {
+	let i;
+	for (i = 0; i < test_cases.length; ++i) {
+		let compile_result = null;
+		try {
+			compile_result = await compile(test_cases[i][0]);
+		} catch (e) {
+			console.log("== Failed Test Case ==\nCompiler generated invalid code");
+		}
+		if (compile_result != test_cases[i][1]) {
 			console.log("== Failed Test Case ==\n'%s' should return %d", test_cases[i][0], test_cases[i][1]);
 			break;
 		}
 	}
-	console.clear();
-	console.log("== All Test Cases Passed ==");
+	if (i == test_cases.length) {
+		console.clear();
+		console.log("== All Test Cases Passed ==");
+	}
 }();

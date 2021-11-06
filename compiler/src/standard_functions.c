@@ -43,6 +43,8 @@ bool startswith(const char *p, const char *q) {
 	return true;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 int vprintf(const char *fmt, va_list ap) {
 	static char buffer[512] = {0};
 	unsigned int b = 0;
@@ -93,6 +95,7 @@ void print_int(int s) {
 void print_uint(unsigned int s) {
 	_print(s, 0);
 }
+#pragma GCC diagnostic pop
 
 unsigned int str_lu(char *str, char **end) {
 	unsigned int num = 0;
