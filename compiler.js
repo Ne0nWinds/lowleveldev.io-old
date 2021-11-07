@@ -13,7 +13,7 @@ const imports = {
 	}
 };
 const { instance } = await WebAssembly.instantiateStreaming(
-	fetch("./compiler/binary.wasm"),
+	fetch("./compiler/build/binary.wasm"),
 	{ 
 		"env": imports
 	}
