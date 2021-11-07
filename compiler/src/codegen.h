@@ -13,7 +13,9 @@ typedef enum {
 	ND_LE,
 	ND_GT,
 	ND_GE,
-	ND_EXPR
+	ND_EXPR,
+	ND_ASSIGN,
+	ND_VAR
 } NodeKind;
 
 typedef struct Node Node;
@@ -22,6 +24,7 @@ struct Node {
 	Node *next;
 	Node *lhs;
 	Node *rhs;
+	char name;
 	int val;
 };
 

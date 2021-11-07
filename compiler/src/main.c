@@ -78,7 +78,7 @@ extern unsigned int compile() {
 
 	if (!node) return 0;
 
-	print_tree(node);
+	// print_tree(node);
 
 	if (CurrentToken()->kind != TK_EOF)
 		error_tok(CurrentToken(), "extra token");
