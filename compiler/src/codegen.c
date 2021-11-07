@@ -40,8 +40,10 @@ static bool equal(const Token *token, char *op) {
 
 void skip(char *s) {
 	const Token *tok = CurrentToken();
-	if (!equal(tok, s))
+	if (!equal(tok, s)) {
 		error_tok(tok, "expected '%s'", s);
+		error_parsing = true;
+	}
 	NextToken();
 }
 

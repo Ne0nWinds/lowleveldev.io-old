@@ -16,7 +16,7 @@ void *memset(void *str, int c, unsigned int n) {
 	return str;
 }
 
-void *memcpy(void *dest, const void *src, unsigned int n) {
+void *memcpy(void * restrict dest, const void * restrict src, unsigned int n) {
 	unsigned int i = 0;
 	for (; i < n; i += 16) {
 		v128_t src_vec = wasm_v128_load(src + i);
@@ -34,7 +34,7 @@ unsigned int strlen(const char *str) {
 	return n;
 }
 
-bool startswith(const char *p, const char *q) {
+bool startswith(const char * restrict p, const char * restrict q) {
 	while (*q) {
 		if (*q != *p) return false;
 		q += 1;
@@ -42,6 +42,10 @@ bool startswith(const char *p, const char *q) {
 	}
 	return true;
 }
+
+#ifndef _DEBUG
+#define _print(a, b)
+#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
@@ -83,9 +87,7 @@ int printf(const char *fmt, ...) {
 }
 
 void print(const char *src) {
-	unsigned int i = 0;
-	while (src[i] != 0) ++i;
-	_print(src, i);
+	_print(src, strlen(src));
 }
 
 void print_int(int s) {

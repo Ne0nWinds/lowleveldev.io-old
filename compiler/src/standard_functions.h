@@ -6,6 +6,7 @@ unsigned int strlen(const char *str);
 bool startswith(const char *p, const char *q);
 int vprintf(const char *fmt, va_list ap);
 int printf(const char *fmt, ...);
+
 void print(const char *src);
 void print_int(int s);
 void print_uint(unsigned int s);
