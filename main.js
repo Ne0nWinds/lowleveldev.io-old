@@ -28,32 +28,32 @@ const test_cases = [
 	['1; 2;', 2],
 ];
 
+const encoder = new TextEncoder('utf-8');
+const view = new Uint8Array(compiler.memory.buffer, compiler.get_mem_addr(), 1024);
+
 async function compile(value) {
 	const start = performance.now();
-	const encoder = new TextEncoder('utf-8');
-	const addr = compiler.get_mem_addr();
-
-	const view = new Uint8Array(compiler.memory.buffer, addr, value.length + 1);
 	encoder.encodeInto(value, view);
 	view[value.length] = 0;
 
 	const len = compiler.compile();
-	const compilationToWebAssembly = performance.now() - start;
 	if (len == 0) {
 		console.log("== Compilation Failed == ");
 		return;
 	}
+
 	const view2 = new Uint8Array(compiler.memory.buffer, compiler.get_compiled_code(), len);
+	const compilationToWebAssembly = performance.now();
 
 	const { instance } = await WebAssembly.instantiate(view2);
-	const webAssemblyToX86 = performance.now() - start;
+	const webAssemblyToX86 = performance.now();
 	let returnValue = instance.exports.main();
-	const webAssemblyRuntime = performance.now() - start;
+	const webAssemblyRuntime = performance.now();
 	console.log(view2);
-	console.log("WebAssembly to x86 -- %.3fms", webAssemblyToX86);
-	console.log("Compilation to WebAssembly -- %.3fms", compilationToWebAssembly);
-	console.log("WebAssembly Runtime -- %.3fms", webAssemblyRuntime);
-	console.log("Total Time -- %.3fms", webAssemblyToX86 + compilationToWebAssembly + webAssemblyRuntime);
+	console.log("Compilation to WebAssembly -- %.3fms", compilationToWebAssembly - start);
+	console.log("WebAssembly to x86 -- %.3fms", webAssemblyToX86 - compilationToWebAssembly);
+	console.log("WebAssembly Runtime -- %.3fms", webAssemblyRuntime - webAssemblyToX86);
+	console.log("Total Time -- %.3fms", webAssemblyRuntime - start);
 	console.log("== Compilation Successful == ");
 	console.log(returnValue);
 	return returnValue;
