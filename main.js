@@ -29,6 +29,7 @@ const test_cases = [
 ];
 
 async function compile(value) {
+	const start = Date.now();
 	const encoder = new TextEncoder('utf-8');
 	const addr = compiler.get_mem_addr();
 
@@ -37,6 +38,7 @@ async function compile(value) {
 	view[value.length] = 0;
 
 	const len = compiler.compile();
+	console.log("Compilation to WebAssembly -- %dms", Date.now() - start);
 	if (len == 0) {
 		console.log("== Compilation Failed == ");
 		return;
@@ -45,7 +47,9 @@ async function compile(value) {
 	console.log(view2);
 
 	const { instance } = await WebAssembly.instantiate(view2);
+	console.log("WebAssembly to x86 -- %dms", Date.now() - start);
 	let returnValue = instance.exports.main();
+	console.log("WebAssembly Runtime -- %dms", Date.now() - start);
 	console.log("== Compilation Successful == ");
 	console.log(returnValue);
 	return returnValue;
