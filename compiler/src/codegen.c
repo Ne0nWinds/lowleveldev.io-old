@@ -386,5 +386,9 @@ void gen_expr(Node *node, unsigned int *byte_length, unsigned char *output_code)
 			--depth;
 		}
 	}
+	if (depth == 0) {
+		c[n_byte_length++] = OP_I32_CONST;
+		c[n_byte_length++] = 0;
+	}
 	*byte_length = n_byte_length;
 }
