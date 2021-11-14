@@ -2,3 +2,4 @@
 *.wat
 *.o
 *.bc
+build/

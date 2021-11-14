@@ -17,3 +17,17 @@ void verror_at(char *loc, char *fmt, va_list ap);
 void error_at(char *loc, char *fmt, ...);
 void error(const char *str);
 void error_tok(const Token *token, char *fmt, ...);
+
+#define EncodeLEB128(writeable, x, n_byte_length) {\
+	typeof(x) value = x;\
+	unsigned char *src = writeable;\
+	unsigned char byte;\
+	do {\
+		byte = (value & 0x7F) | 0x80;\
+		value >>= 7;\
+		n_byte_length += 1;\
+		*(src)++ = byte;\
+	} while ((value && !(byte & 0x40)) || (value != -1 && (byte & 0x40)));\
+	byte &= 0x7F;\
+	*(src - 1) = byte;\
+}

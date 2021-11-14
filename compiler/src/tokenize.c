@@ -2,8 +2,8 @@
 #include "defines.h"
 #include "standard_functions.h"
 
-Token AllTokens[512] = {0};
-Token *_CurrentToken = AllTokens;
+static Token AllTokens[512] = {0};
+static Token *_CurrentToken = AllTokens;
 
 const Token *CurrentToken() {
 	return _CurrentToken;
@@ -23,6 +23,7 @@ static void print_token_type(Token t) {
 		case TK_EOF: print("TK_EOF"); break;
 		case TK_PUNCT: print("TK_PUNCT"); break;
 		case TK_NUM: print("TK_NUM"); break;
+		case TK_IDENTIFIER: print("TK_IDENTIFIER"); break;
 	}
 }
 
@@ -33,12 +34,12 @@ static int read_punct(char *p) {
 	return is_punct(*p);
 }
 
-static Token *new_token(TokenKind kind, char *start, char *end) {
+static Token *new_token(TokenKind kind, char *start, unsigned int length) {
 	Token *tok = _CurrentToken;
 	_CurrentToken += 1;
 	tok->kind = kind;
 	tok->loc = start;
-	tok->len = end - start;
+	tok->len = length;
 	print_token_type(*tok);
 	return tok;
 }
@@ -55,7 +56,7 @@ Token *tokenize(char *p) {
 		}
 
 		if (is_digit(*p)) {
-			current = new_token(TK_NUM, p, p);
+			current = new_token(TK_NUM, p, 0);
 			char *q = p;
 			current->val = str_lu(p, &p);
 			current->len = p - q;
@@ -64,15 +65,21 @@ Token *tokenize(char *p) {
 
 		int punct_len = read_punct(p);
 		if (punct_len) {
-			current = new_token(TK_PUNCT, p, p + punct_len);
+			current = new_token(TK_PUNCT, p, punct_len);
 			p += punct_len;
 			continue;
 		}
 
-		error_at(p, "invalid token %s", __FILE_NAME__);
+		if ('a' <= *p && 'z' >= *p) {
+			current = new_token(TK_IDENTIFIER, p, 1);
+			p += 1;
+			continue;
+		}
+
+		error_at(p, "invalid token %s, %s", __FILE_NAME__, p);
 		return 0;
 	}
-	current = new_token(TK_EOF, p, p);
+	current = new_token(TK_EOF, p, 0);
 	return AllTokens;
 }
 
