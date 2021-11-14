@@ -96,6 +96,31 @@ int vprintf(const char *fmt, va_list ap) {
 					} while (length);
 					b += length2;
 				} break;
+				case 'X':
+				case 'x': {
+					bool is_uppercase = fmt[f] == 'X';
+					unsigned int d = va_arg(ap, unsigned int);
+					unsigned int length = 0;
+					unsigned int d_len_test = d;
+					do {
+						++length;
+						d_len_test /= 16;
+					} while (d_len_test);
+					unsigned int length2 = length;
+					do {
+						char c = d % 16;
+						d /= 16;
+						if (c < 10) {
+							c += '0';
+						} else {
+							c -= 10;
+							c += (is_uppercase) ? 'A' : 'a';
+						}
+						--length;
+						buffer[b + length] = c;
+					} while (length);
+					b += length2;
+				} break;
 				default: {
 					return -1;
 				} break;
