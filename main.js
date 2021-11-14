@@ -26,6 +26,8 @@ const test_cases = [
 	['0 >= - 1;', 1],
 	['-1 > -129;', 1],
 	['1; 2;', 2],
+	['a = 3; a;', 3],
+	['a = 15; b = 25 * 3; b - a + 1;', 61]
 ];
 
 const encoder = new TextEncoder('utf-8');
@@ -44,12 +46,12 @@ async function compile(value) {
 
 	const view2 = new Uint8Array(compiler.memory.buffer, compiler.get_compiled_code(), len);
 	const compilationToWebAssembly = performance.now();
+	console.log(view2);
 
 	const { instance } = await WebAssembly.instantiate(view2);
 	const webAssemblyToX86 = performance.now();
 	let returnValue = instance.exports.main();
 	const webAssemblyRuntime = performance.now();
-	console.log(view2);
 	console.log("Compilation to WebAssembly -- %.3fms", compilationToWebAssembly - start);
 	console.log("WebAssembly to x86 -- %.3fms", webAssemblyToX86 - compilationToWebAssembly);
 	console.log("WebAssembly Runtime -- %.3fms", webAssemblyRuntime - webAssemblyToX86);
@@ -60,8 +62,8 @@ async function compile(value) {
 }
 
 void async function() {
-	let i;
-	for (i = 0; i < test_cases.length; ++i) {
+	let i = 0;
+	for (; i < test_cases.length; ++i) {
 		let compile_result = null;
 		try {
 			compile_result = await compile(test_cases[i][0]);

@@ -24,8 +24,10 @@ struct Node {
 	Node *next;
 	Node *lhs;
 	Node *rhs;
-	char name;
-	int val;
+	union {
+		char name;
+		int val;
+	};
 };
 
 void gen_expr(Node *node, unsigned int *byte_length, unsigned char *c);

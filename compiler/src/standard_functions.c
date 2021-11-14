@@ -2,14 +2,7 @@
 
 __attribute__((always_inline))
 void *memset(void *str, int c, unsigned int n) {
-	v128_t c_vectorized = wasm_i8x16_splat(c);
-
-	unsigned int i = 0;
-	for (;i < n; i += 16) {
-		wasm_v128_store(str + i, c_vectorized);
-	}
-
-	for (; i < n; ++i) {
+	for (int i; i < n; ++i) {
 		((unsigned char *)str)[i] = c;
 	}
 
@@ -17,12 +10,7 @@ void *memset(void *str, int c, unsigned int n) {
 }
 
 void *memcpy(void * restrict dest, const void * restrict src, unsigned int n) {
-	unsigned int i = 0;
-	for (; i < n; i += 16) {
-		v128_t src_vec = wasm_v128_load(src + i);
-		wasm_v128_store(dest + i, src_vec);
-	}
-	for (; i < n; ++i) {
+	for (unsigned int i = 0; i < n; ++i) {
 		((unsigned char *)dest)[i] = ((unsigned char *)src)[i];
 	}
 	return dest;
@@ -62,12 +50,51 @@ int vprintf(const char *fmt, va_list ap) {
 					const char *str = va_arg(ap, const char *);
 					while (*str) buffer[b++] = *str++;
 				} break;
+				case 'c': {
+					const char c = va_arg(ap, int);
+					buffer[b++] = c;
+				} break;
 				case '%': {
 					buffer[b++] = '%';
 				} break;
+				case 'i':
 				case 'd': {
 					int d = va_arg(ap, int);
-					buffer[b++] = d + '0';
+					if (d < 0) {
+						buffer[b++] = '-';
+						d *= -1;
+					}
+					unsigned char length = 0;
+					int d_len_test = d;
+					do {
+						++length;
+						d_len_test /= 10;
+					} while (d_len_test);
+					unsigned char length2 = length;
+					do {
+						char c = d % 10 + '0';
+						d /= 10;
+						--length;
+						buffer[b + length] = c;
+					} while (length);
+					b += length2;
+				} break;
+				case 'u': {
+					unsigned int d = va_arg(ap, unsigned int);
+					unsigned char length = 0;
+					int d_len_test = d;
+					do {
+						++length;
+						d_len_test /= 10;
+					} while (d_len_test);
+					unsigned char length2 = length;
+					do {
+						char c = d % 10 + '0';
+						d /= 10;
+						--length;
+						buffer[b + length] = c;
+					} while (length);
+					b += length2;
 				} break;
 				default: {
 					return -1;

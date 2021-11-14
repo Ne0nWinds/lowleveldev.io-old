@@ -31,6 +31,12 @@ static Node *new_num(int val) {
 	return node;
 }
 
+static Node *new_variable(char name) {
+	Node *node = new_node(ND_VAR);
+	node->name = name;
+	return node;
+}
+
 static bool equal(const Token *token, char *op) {
 	for (unsigned int i = 0; i < token->len; ++i) {
 		if (token->loc[i] != op[i]) return 0;
@@ -53,10 +59,10 @@ static Node *new_expr();
 static Node *mul();
 static Node *unary();
 static Node *primary();
-
 static Node *equality();
 static Node *relational();
 static Node *add();
+static Node *assign();
 
 Node *ParseTokens() {
 	ResetCurrentToken();
@@ -77,7 +83,16 @@ static Node *new_expr() {
 }
 
 static Node *expr() {
-	return equality();
+	return assign();
+}
+
+static Node *assign() {
+	Node *node = equality();
+	if (equal(CurrentToken(), "=")) {
+		NextToken();
+		node = new_binary(ND_ASSIGN, node, assign());
+	}
+	return node;
 }
 
 static Node *add() {
@@ -198,23 +213,15 @@ static Node *primary() {
 		return node;
 	}
 
+	if (CurrentToken()->kind == TK_IDENTIFIER) {
+		Node *node = new_variable(*CurrentToken()->loc);
+		NextToken();
+		return node;
+	}
+
 	error_tok(CurrentToken(), "expected an expression");
 	error_parsing = true;
 	return 0;
-}
-
-#define EncodeLEB128(writeable, x, n_byte_length) {\
-	typeof(x) value = x;\
-	unsigned char *src = writeable;\
-	unsigned char byte;\
-	do {\
-		byte = (value & 0x7F) | 0x80;\
-		value >>= 7;\
-		n_byte_length += 1;\
-		*(src)++ = byte;\
-	} while ((value && !(byte & 0x40)) || (value != -1 && (byte & 0x40)));\
-	byte &= 0x7F;\
-	*(src - 1) = byte;\
 }
 
 static char *NodeKind_str[] = {
@@ -249,6 +256,12 @@ void print_tree(Node *node) {
 static unsigned int n_byte_length;
 static unsigned char *c = 0;
 
+int mem_offset(char c) {
+	return 1024 + (c - 'a') * 4;
+}
+
+static int depth = 0;
+
 static void _gen_expr(Node *node) {
 	switch (node->kind) {
 		case ND_NUM: {
@@ -256,6 +269,7 @@ static void _gen_expr(Node *node) {
 			EncodeLEB128(c + n_byte_length, node->val, n_byte_length);
 			print("OP_I32_CONST");
 			print_int(node->val);
+			++depth;
 			return;
 		} break;
 		case ND_NEG: {
@@ -267,7 +281,37 @@ static void _gen_expr(Node *node) {
 			c[n_byte_length++] = OP_I32_MUL;
 			print("OP_I32_MUL");
 			return;
-		}
+		} break;
+		case ND_VAR: {
+			print("ND_VAR");
+			printf("Name: %d", node->name);
+			c[n_byte_length++] = OP_I32_CONST;
+			c[n_byte_length++] = 0;
+			print("OP_I32_CONST");
+			print_int(0);
+			c[n_byte_length++] = OP_I32_LOAD;
+			c[n_byte_length++] = 2;
+			c[n_byte_length++] = mem_offset(node->name);
+			print("OP_I32_LOAD");
+			printf("%d\n", mem_offset(node->name));
+			++depth;
+			return;
+		} break;
+		case ND_ASSIGN: {
+			print("ND_ASSIGN");
+			c[n_byte_length++] = OP_I32_CONST;
+			c[n_byte_length++] = 0;
+			print("OP_I32_CONST");
+			print_int(0);
+			_gen_expr(node->rhs);
+			c[n_byte_length++] = OP_I32_STORE;
+			c[n_byte_length++] = 2;
+			c[n_byte_length++] = mem_offset(node->lhs->name);
+			print("OP_I32_STORE");
+			printf("%d\n", mem_offset(node->lhs->name));
+			--depth;
+			return;
+		} break;
 	}
 	_gen_expr(node->lhs);
 	_gen_expr(node->rhs);
@@ -276,42 +320,52 @@ static void _gen_expr(Node *node) {
 		case ND_ADD: {
 			c[n_byte_length++] = OP_I32_ADD;
 			print("OP_I32_ADD");
+			--depth;
 		} break;
 		case ND_SUB: {
 			c[n_byte_length++] = OP_I32_SUB;
 			print("OP_I32_SUB");
+			--depth;
 		} break;
 		case ND_MUL: {
 			c[n_byte_length++] = OP_I32_MUL;
 			print("OP_I32_MUL");
+			--depth;
 		} break;
 		case ND_DIV: {
 			c[n_byte_length++] = OP_I32_DIV_U;
 			print("OP_I32_DIV");
+			--depth;
 		} break;
 		case ND_EQ: {
 			c[n_byte_length++] = OP_I32_EQ;
 			print("OP_I32_EQ");
+			--depth;
 		} break;
 		case ND_NE: {
 			c[n_byte_length++] = OP_I32_NE;
 			print("OP_I32_NE");
+			--depth;
 		} break;
 		case ND_LT: {
 			c[n_byte_length++] = OP_I32_LT_S;
 			print("OP_I32_LT");
+			--depth;
 		} break;
 		case ND_LE: {
 			c[n_byte_length++] = OP_I32_LE_S;
 			print("OP_I32_LE");
+			--depth;
 		} break;
 		case ND_GT: {
 			c[n_byte_length++] = OP_I32_GT_S;
 			print("OP_I32_GT");
+			--depth;
 		} break;
 		case ND_GE: {
 			c[n_byte_length++] = OP_I32_GE_S;
 			print("OP_I32_GE");
+			--depth;
 		} break;
 		default: {
 			error("invalid expression");
@@ -323,11 +377,13 @@ static void _gen_expr(Node *node) {
 void gen_expr(Node *node, unsigned int *byte_length, unsigned char *output_code) {
 	n_byte_length = *byte_length;
 	c = output_code;
+	depth = 0;
 	for (Node *n = node; n && n->kind == ND_EXPR; n = n->next) {
 		_gen_expr(n->lhs);
-		if (n->next) {
+		if (n->next && depth) {
 			print("OP_DROP");
 			c[n_byte_length++] = OP_DROP;
+			--depth;
 		}
 	}
 	*byte_length = n_byte_length;

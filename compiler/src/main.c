@@ -36,6 +36,7 @@ __attribute__((export_name("compile")))
 extern unsigned int compile() {
 
 	c = compiled_code;
+	memset(c, 0, sizeof(compiled_code));
 
 	c += WASM_header(c);
 
@@ -53,6 +54,13 @@ extern unsigned int compile() {
 	c[2] = 0x1;
 	c[3] = 0x0;
 	c += 4;
+
+	c[0] = SECTION_MEMORY;
+	c[1] = 0x3;
+	c[2] = 0x1;
+	c[3] = 0x0;
+	c[4] = 0x1;
+	c += 5;
 
 	c[0] = SECTION_EXPORT;
 	c[1] = 0x08;
@@ -72,13 +80,16 @@ extern unsigned int compile() {
 
 	n_byte_length = 0;
 
-	if (!tokenize(ct)) return 0;
+	Token *t = tokenize(ct);
+	if (!t) return 0;
 
 	Node *node = ParseTokens();
 
 	if (!node) return 0;
 
-	// print_tree(node);
+#if _DEBUG
+	print_tree(node);
+#endif
 
 	if (CurrentToken()->kind != TK_EOF)
 		error_tok(CurrentToken(), "extra token");
