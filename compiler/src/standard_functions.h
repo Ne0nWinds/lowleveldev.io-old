@@ -1,8 +1,9 @@
 #pragma once
 #include "defines.h"
 void *memset(void *str, int c, unsigned int n);
-void *memcpy(void *dest, const void *src, unsigned int n);
+void *memcpy(void * restrict dest, const void * restrict src, unsigned int n);
 unsigned int strlen(const char *str);
+int strncmp(const char *str1, const char *str2, unsigned int num);
 bool startswith(const char *p, const char *q);
 int vprintf(const char *fmt, va_list ap);
 int printf(const char *fmt, ...);

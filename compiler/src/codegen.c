@@ -6,6 +6,10 @@ Node AllNodes[512] = {0};
 Node *CurrentNode = AllNodes;
 static bool error_parsing = false;
 
+static int align_to(int n, int align) {
+	return (n + align - 1) / align * align;
+}
+
 static Node *new_node(NodeKind kind) {
 	Node *node = CurrentNode++;
 	node->kind = kind;
@@ -31,10 +35,26 @@ static Node *new_num(int val) {
 	return node;
 }
 
-static Node *new_variable(char name) {
+static Obj Locals[512];
+Obj *CurrentLocal = 0;
+static char *Names[2048] = {0};
+char *CurrentChar = (char *)Names;
+
+static Node *new_variable(Obj *var) {
 	Node *node = new_node(ND_VAR);
-	node->name = name;
+	node->var = var;
 	return node;
+}
+
+static Obj *new_lvar(char *name, unsigned int len) {
+	Obj *var = CurrentLocal;
+	CurrentLocal += 1;
+	memcpy(CurrentChar, name, len);
+	var->name = CurrentChar;
+	CurrentChar += len;
+	*CurrentChar = 0;
+	CurrentChar += 1;
+	return var;
 }
 
 static bool equal(const Token *token, char *op) {
@@ -53,7 +73,7 @@ void skip(char *s) {
 	NextToken();
 }
 
-Node *ParseTokens();
+Function *ParseTokens();
 static Node *expr();
 static Node *new_expr();
 static Node *mul();
@@ -64,7 +84,17 @@ static Node *relational();
 static Node *add();
 static Node *assign();
 
-Node *ParseTokens() {
+static Obj *find_var(const Token *tok) {
+	for (Obj *var = Locals; var != CurrentLocal; ++var) {
+		if (strlen(var->name) == tok->len && !strncmp(tok->loc, var->name, tok->len))
+			return var;
+	}
+	return 0;
+}
+
+Function *ParseTokens() {
+	CurrentLocal = Locals;
+	CurrentChar = (char *)Names;
 	ResetCurrentToken();
 	error_parsing = false;
 	memset(AllNodes, 0, sizeof(AllNodes));
@@ -74,8 +104,12 @@ Node *ParseTokens() {
 		LocalCurrent->next = new_expr();
 		LocalCurrent = LocalCurrent->next;
 	}
-	return (!error_parsing) ? head : 0;
+	static Function prog = {0};
+	prog.body = head;
+	prog.locals = Locals;
+	return (!error_parsing) ? &prog : 0;
 }
+
 static Node *new_expr() {
 	Node *node = new_unary(ND_EXPR, expr());
 	skip(";");
@@ -214,9 +248,11 @@ static Node *primary() {
 	}
 
 	if (CurrentToken()->kind == TK_IDENTIFIER) {
-		Node *node = new_variable(*CurrentToken()->loc);
+		Obj *var = find_var(CurrentToken());
+		if (!var)
+			var = new_lvar(CurrentToken()->loc, CurrentToken()->len);
 		NextToken();
-		return node;
+		return new_variable(var);
 	}
 
 	error_tok(CurrentToken(), "expected an expression");
@@ -256,10 +292,6 @@ void print_tree(Node *node) {
 static unsigned int n_byte_length;
 static unsigned char *c = 0;
 
-int mem_offset(char c) {
-	return 1024 + (c - 'a') * 4;
-}
-
 static int depth = 0;
 
 static void _gen_expr(Node *node) {
@@ -267,8 +299,7 @@ static void _gen_expr(Node *node) {
 		case ND_NUM: {
 			c[n_byte_length++] = OP_I32_CONST;
 			EncodeLEB128(c + n_byte_length, node->val, n_byte_length);
-			print("OP_I32_CONST");
-			print_int(node->val);
+			printf("OP_I32_CONST: %d\n", node->val);
 			++depth;
 			return;
 		} break;
@@ -276,24 +307,22 @@ static void _gen_expr(Node *node) {
 			_gen_expr(node->lhs);
 			c[n_byte_length++] = OP_I32_CONST;
 			EncodeLEB128(c + n_byte_length, -1, n_byte_length);
-			print("OP_I32_CONST");
-			print_int(-1);
+			printf("OP_I32_CONST: %d\n", -1);
 			c[n_byte_length++] = OP_I32_MUL;
 			print("OP_I32_MUL");
 			return;
 		} break;
 		case ND_VAR: {
 			print("ND_VAR");
-			printf("Name: %d", node->name);
+			printf("Name: %s", node->var->name);
 			c[n_byte_length++] = OP_I32_CONST;
 			c[n_byte_length++] = 0;
-			print("OP_I32_CONST");
-			print_int(0);
+			printf("OP_I32_CONST: %d\n", 0);
 			c[n_byte_length++] = OP_I32_LOAD;
 			c[n_byte_length++] = 2;
-			c[n_byte_length++] = mem_offset(node->name);
+			EncodeLEB128(c + n_byte_length, node->var->offset, n_byte_length);
 			print("OP_I32_LOAD");
-			printf("%d\n", mem_offset(node->name));
+			printf("%d\n", node->var->offset);
 			++depth;
 			return;
 		} break;
@@ -301,14 +330,13 @@ static void _gen_expr(Node *node) {
 			print("ND_ASSIGN");
 			c[n_byte_length++] = OP_I32_CONST;
 			c[n_byte_length++] = 0;
-			print("OP_I32_CONST");
-			print_int(0);
+			printf("OP_I32_CONST: %d\n", 0);
 			_gen_expr(node->rhs);
 			c[n_byte_length++] = OP_I32_STORE;
 			c[n_byte_length++] = 2;
-			c[n_byte_length++] = mem_offset(node->lhs->name);
+			EncodeLEB128(c + n_byte_length, node->lhs->var->offset, n_byte_length);
 			print("OP_I32_STORE");
-			printf("%d\n", mem_offset(node->lhs->name));
+			printf("%d\n", node->lhs->var->offset);
 			--depth;
 			return;
 		} break;
@@ -374,11 +402,23 @@ static void _gen_expr(Node *node) {
 	}
 }
 
-void gen_expr(Node *node, unsigned int *byte_length, unsigned char *output_code) {
+static void assign_lvar_offsets(Function *prog) {
+	int offset = 0;
+	for (Obj *var = Locals; var < CurrentLocal; ++var) {
+		offset += 4;
+		var->offset = 128 - offset;
+	}
+	prog->stack_size += align_to(offset, 16);
+}
+
+void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *output_code) {
 	n_byte_length = *byte_length;
 	c = output_code;
 	depth = 0;
-	for (Node *n = node; n && n->kind == ND_EXPR; n = n->next) {
+
+	assign_lvar_offsets(prog);
+
+	for (Node *n = prog->body; n && n->kind == ND_EXPR; n = n->next) {
 		_gen_expr(n->lhs);
 		if (n->next && depth) {
 			print("OP_DROP");
@@ -389,6 +429,7 @@ void gen_expr(Node *node, unsigned int *byte_length, unsigned char *output_code)
 	if (depth == 0) {
 		c[n_byte_length++] = OP_I32_CONST;
 		c[n_byte_length++] = 0;
+		printf("OP_I32_CONST: %d\n", 0);
 	}
 	*byte_length = n_byte_length;
 }

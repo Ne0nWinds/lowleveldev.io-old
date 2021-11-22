@@ -27,7 +27,9 @@ const test_cases = [
 	['-1 > -129;', 1],
 	['1; 2;', 2],
 	['a = 3; a;', 3],
-	['a = 15; b = 25 * 3; b - a + 1;', 61]
+	['a = 15; b = 25 * 3; b - a + 1;', 61],
+	['test_var = 14; test_var;', 14],
+	['var1 = 30; var2 = 32; var2 - var1', 2]
 ];
 
 const encoder = new TextEncoder('utf-8');

@@ -83,18 +83,18 @@ extern unsigned int compile() {
 	Token *t = tokenize(ct);
 	if (!t) return 0;
 
-	Node *node = ParseTokens();
+	Function *prog = ParseTokens();
 
-	if (!node) return 0;
+	if (!prog) return 0;
 
 #if _DEBUG
-	print_tree(node);
+	print_tree(prog->body);
 #endif
 
 	if (CurrentToken()->kind != TK_EOF)
 		error_tok(CurrentToken(), "extra token");
 
-	gen_expr(node, &n_byte_length, c);
+	gen_expr(prog, &n_byte_length, c);
 
 	c[n_byte_length++] = OP_END;
 	c -= 5;

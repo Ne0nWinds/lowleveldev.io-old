@@ -19,17 +19,31 @@ typedef enum {
 } NodeKind;
 
 typedef struct Node Node;
+typedef struct Obj Obj;
+typedef struct Function Function;
+
 struct Node {
 	NodeKind kind;
 	Node *next;
 	Node *lhs;
 	Node *rhs;
 	union {
-		char name;
-		int val;
+		Obj *var; // ND_VAR
+		int val; // ND_NUM
 	};
 };
 
-void gen_expr(Node *node, unsigned int *byte_length, unsigned char *c);
-Node *ParseTokens();
+struct Obj {
+	char *name;
+	int offset;
+};
+
+struct Function {
+	Node *body;
+	Obj *locals;
+	int stack_size;
+};
+
+void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *c);
+Function *ParseTokens();
 void print_tree(Node *node);

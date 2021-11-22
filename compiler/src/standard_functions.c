@@ -22,6 +22,13 @@ unsigned int strlen(const char *str) {
 	return n;
 }
 
+int strncmp(const char *str1, const char *str2, unsigned int num) {
+	while (num-- && *str1 && *str2 && *str1 == *str2);
+	if (*str1 < *str2) return -1;
+	if (*str1 > *str2) return 1;
+	return 0;
+}
+
 bool startswith(const char * restrict p, const char * restrict q) {
 	while (*q) {
 		if (*q != *p) return false;

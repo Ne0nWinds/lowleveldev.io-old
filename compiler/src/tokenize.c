@@ -40,8 +40,18 @@ static Token *new_token(TokenKind kind, char *start, unsigned int length) {
 	tok->kind = kind;
 	tok->loc = start;
 	tok->len = length;
+#if _DEBUG
 	print_token_type(*tok);
+#endif
 	return tok;
+}
+
+static bool is_ident1(char c) {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+static bool is_ident2(char c) {
+	return is_ident1(c) || (c >= '0' && c <= '9');
 }
 
 Token *tokenize(char *p) {
@@ -70,9 +80,12 @@ Token *tokenize(char *p) {
 			continue;
 		}
 
-		if ('a' <= *p && 'z' >= *p) {
-			current = new_token(TK_IDENTIFIER, p, 1);
-			p += 1;
+		if (is_ident1(*p)) {
+			char *start = p;
+			do {
+				++p;
+			} while (is_ident2(*p));
+			current = new_token(TK_IDENTIFIER, start, p - start);
 			continue;
 		}
 
