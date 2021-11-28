@@ -4,6 +4,7 @@ typedef enum {
 	TK_EOF = 0,
 	TK_PUNCT,
 	TK_IDENTIFIER,
+	TK_KEYWORD,
 	TK_NUM,
 } TokenKind;
 

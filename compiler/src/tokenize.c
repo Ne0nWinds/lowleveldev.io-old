@@ -10,8 +10,7 @@ const Token *CurrentToken() {
 }
 
 const Token *NextToken() {
-	_CurrentToken += 1;
-	return _CurrentToken;
+	return ++_CurrentToken;
 }
 
 void ResetCurrentToken() {
@@ -24,6 +23,7 @@ static void print_token_type(Token t) {
 		case TK_PUNCT: print("TK_PUNCT"); break;
 		case TK_NUM: print("TK_NUM"); break;
 		case TK_IDENTIFIER: print("TK_IDENTIFIER"); break;
+		case TK_KEYWORD: print("TK_KEYWORD"); break;
 	}
 }
 
@@ -54,11 +54,16 @@ static bool is_ident2(char c) {
 	return is_ident1(c) || (c >= '0' && c <= '9');
 }
 
+static bool is_keyword(const char *c, const unsigned int len) {
+	if (!strncmp(c, "return", len)) {
+		return true;
+	}
+	return false;
+}
+
 Token *tokenize(char *p) {
 	memset(AllTokens, 0, sizeof(AllTokens));
 	ResetCurrentToken();
-	Token *current = 0;
-
 	while (*p) {
 		if (is_whitespace(*p)) {
 			p += 1;
@@ -66,7 +71,8 @@ Token *tokenize(char *p) {
 		}
 
 		if (is_digit(*p)) {
-			current = new_token(TK_NUM, p, 0);
+			Token *current = new_token(TK_NUM, p, 0);
+			print(p);
 			char *q = p;
 			current->val = str_lu(p, &p);
 			current->len = p - q;
@@ -75,7 +81,7 @@ Token *tokenize(char *p) {
 
 		int punct_len = read_punct(p);
 		if (punct_len) {
-			current = new_token(TK_PUNCT, p, punct_len);
+			new_token(TK_PUNCT, p, punct_len);
 			p += punct_len;
 			continue;
 		}
@@ -85,14 +91,15 @@ Token *tokenize(char *p) {
 			do {
 				++p;
 			} while (is_ident2(*p));
-			current = new_token(TK_IDENTIFIER, start, p - start);
+			unsigned int length = p - start;
+			new_token(is_keyword(start, length) ? TK_KEYWORD : TK_IDENTIFIER, start, length);
 			continue;
 		}
 
 		error_at(p, "invalid token %s, %s", __FILE_NAME__, p);
 		return 0;
 	}
-	current = new_token(TK_EOF, p, 0);
+	new_token(TK_EOF, p, 0);
 	return AllTokens;
 }
 

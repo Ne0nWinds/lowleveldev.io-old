@@ -23,7 +23,7 @@ unsigned int strlen(const char *str) {
 }
 
 int strncmp(const char *str1, const char *str2, unsigned int num) {
-	while (num && *str1 && ( *str1 == *str2 ) )
+	while (num && *str1 && (*str1 == *str2))
 	{
 		++str1;
 		++str2;

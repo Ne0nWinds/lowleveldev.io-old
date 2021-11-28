@@ -5,31 +5,35 @@ const editor = document.getElementById("editor");
 let timeoutId = 0;
 editor.oninput = () => {
 	clearTimeout(timeoutId);
-	timeoutId = setTimeout(() => compile(editor.value), 150);
+	// compile(editor.value);
+	timeoutId = setTimeout(() => compile(editor.value), 650);
 }
 
 const test_cases = [
-	['0;', 0],
-	['42;', 42],
-	['5+20-4;', 21],
-	[' 12     + 34   - 5;', 41],
-	['5+6*7;', 47],
-	['-10+20;', 10],
-	['- -10;', 10],
-	['- - +10;', 10],
-	['27 == 27;', 1],
-	['1 != 32;', 1],
-	['2 * 50   >=    200 / 2   ;', 1],
-	['2 > 1;', 1],
-	['(2 > 1) * 8 \n;', 8],
-	['- 1 == - 1;', 1],
-	['0 >= - 1;', 1],
-	['-1 > -129;', 1],
-	['1; 2;', 2],
-	['a = 3; a;', 3],
-	['a = 15; b = 25 * 3; b - a + 1;', 61],
-	['test_var = 14; test_var;', 14],
-	['var1 = 30; var2 = 32; var2 - var1', 2]
+	['return 0;', 0],
+	['return 42;', 42],
+	['return 5+20-4;', 21],
+	['return 12     + 34   - 5;', 41],
+	['return 5+6*7;', 47],
+	['return -10+20;', 10],
+	['return - -10;', 10],
+	['return - - +10;', 10],
+	['return 27 == 27;', 1],
+	['return 1 != 32;', 1],
+	['return 2 * 50   >=    200 / 2   ;', 1],
+	['return 2 > 1;', 1],
+	['return (2 > 1) * 8 \n\n;', 8],
+	['return - 1 == - 1;', 1],
+	['return 0 >= - 1;', 1],
+	['return -1 > -129;', 1],
+	['1; return 2;', 2],
+	['a = 3; return a;', 3],
+	['a = 15; b = 25 * 3; return b - a + 1;', 61],
+	['test_var = 14; return test_var;', 14],
+	['var1 = 30; var2 = 32; return var2 - var1;', 2],
+	['var1 = 30; var2 = 32; return -(var2 - var1) + 10;', 8],
+	['return 1; 2; 3;', 1],
+	['a = 16; b = 2; return (a * b) - 8; 1024 - 67;', 24]
 ];
 
 const encoder = new TextEncoder('utf-8');

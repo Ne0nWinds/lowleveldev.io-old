@@ -53,8 +53,9 @@ enum OpCode {
 	OP_I32_DIV_U = 0x6E,
 
 	OP_I32_LOAD = 0x28,
-
 	OP_I32_STORE = 0x36,
+
+	OP_RETURN = 0x0F
 };
 
 // http://webassembly.github.io/spec/core/binary/modules.html#export-section

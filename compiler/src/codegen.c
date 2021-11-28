@@ -117,6 +117,12 @@ static Node *new_expr() {
 }
 
 static Node *expr() {
+	if (CurrentToken()->kind == TK_KEYWORD) {
+		NextToken();
+		Node *node = new_unary(ND_RETURN, assign());
+		return node;
+	}
+
 	return assign();
 }
 
@@ -255,6 +261,8 @@ static Node *primary() {
 		return new_variable(var);
 	}
 
+	printf("%d\n", CurrentToken()->kind);
+
 	error_tok(CurrentToken(), "expected an expression");
 	error_parsing = true;
 	return 0;
@@ -340,7 +348,14 @@ static void _gen_expr(Node *node) {
 			--depth;
 			return;
 		} break;
+		case ND_RETURN: {
+			print("ND_RETURN");
+			_gen_expr(node->lhs);
+			c[n_byte_length++] = OP_RETURN;
+			return;
+		}
 	}
+
 	_gen_expr(node->lhs);
 	_gen_expr(node->rhs);
 
@@ -395,10 +410,6 @@ static void _gen_expr(Node *node) {
 			print("OP_I32_GE");
 			--depth;
 		} break;
-		default: {
-			error("invalid expression");
-			return;
-		}
 	}
 }
 
