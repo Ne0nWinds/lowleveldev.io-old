@@ -145,6 +145,10 @@ static Node *expr() {
 		return node;
 	}
 
+	if (equal(CurrentToken(), ";")) {
+		return new_node(ND_BLOCK);
+	}
+
 	Node *node = assign();
 	return node;
 }
