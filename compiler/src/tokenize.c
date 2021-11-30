@@ -72,7 +72,6 @@ Token *tokenize(char *p) {
 
 		if (is_digit(*p)) {
 			Token *current = new_token(TK_NUM, p, 0);
-			print(p);
 			char *q = p;
 			current->val = str_lu(p, &p);
 			current->len = p - q;

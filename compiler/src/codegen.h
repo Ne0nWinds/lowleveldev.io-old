@@ -16,7 +16,8 @@ typedef enum {
 	ND_EXPR,
 	ND_ASSIGN,
 	ND_RETURN,
-	ND_VAR
+	ND_VAR,
+	ND_BLOCK
 } NodeKind;
 
 typedef struct Node Node;
@@ -28,6 +29,7 @@ struct Node {
 	Node *next;
 	Node *lhs;
 	Node *rhs;
+	Node *body;
 	union {
 		Obj *var; // ND_VAR
 		int val; // ND_NUM
