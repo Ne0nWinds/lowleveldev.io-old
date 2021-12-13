@@ -27,7 +27,6 @@ enum Valtype {
 
 // https://webassembly.github.io/spec/core/binary/instructions.html
 enum OpCode {
-	OP_END = 0x0b,
 	OP_GET_LOCAL = 0x20,
 	OP_F32_ADD = 0x92,
 
@@ -55,7 +54,10 @@ enum OpCode {
 	OP_I32_LOAD = 0x28,
 	OP_I32_STORE = 0x36,
 
-	OP_RETURN = 0x0F
+	OP_IF = 0x04,
+	OP_ELSE = 0x05,
+	OP_RETURN = 0x0F,
+	OP_END = 0x0B
 };
 
 // http://webassembly.github.io/spec/core/binary/modules.html#export-section

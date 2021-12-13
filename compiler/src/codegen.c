@@ -99,6 +99,7 @@ Function *ParseTokens() {
 	ResetCurrentToken();
 	error_parsing = false;
 	memset(AllNodes, 0, sizeof(AllNodes));
+	skip("{");
 	Node *head = complex_expr();
 	Node *LocalCurrent = head;
 	while (CurrentToken()->kind && !error_parsing) {
@@ -117,40 +118,67 @@ static Node *new_expr() {
 	return node;
 }
 
+static Node *expr_or_block() {
+	Node *node = 0;
+	if (equal(CurrentToken(), "{")) {
+		NextToken();
+		node = complex_expr();
+	} else {
+		node = expr();
+		skip(";");
+	}
+	return node;
+}
+
 static Node *complex_expr() {
 	Node head = {};
 	Node *current = &head;
-	NextToken();
-	do {
+
+	while (!equal(CurrentToken(), "}") && !error_parsing) {
 		if (equal(CurrentToken(), "{")) {
-			current->next = complex_expr();
-			current = current->next;
+			NextToken();
+			current = current->next = complex_expr();
+		} else if (equal(CurrentToken(), "if")) {
+			NextToken();
+			Node *node = new_node(ND_IF);
+			skip("(");
+			node->condition = expr();
+			skip(")");
+			node->then = expr_or_block();
+			node->els = 0;
+			if (equal(CurrentToken(), "else")) {
+				NextToken();
+				node->els = expr_or_block();
+			}
+			current = current->next = node;
 		} else {
-			current->next = expr();
-			current = current->next;
+			current = current->next = expr();
 			skip(";");
 		}
-	} while (!equal(CurrentToken(), "}") && !error_parsing);
+	}
+
 	skip("}");
+
 	Node *node = new_node(ND_BLOCK);
 	node->body = head.next;
 	return node;
 }
 
 static Node *expr() {
+	Node *node = 0;
 	if (CurrentToken()->kind == TK_KEYWORD) {
-		// only handles "return"
-		NextToken();
-		Node *node = new_unary(ND_RETURN, assign());
-		return node;
+		if (equal(CurrentToken(), "return")) {
+			NextToken();
+			node = new_unary(ND_RETURN, assign());
+			return node;
+		}
 	}
 
 	if (equal(CurrentToken(), ";")) {
 		return new_node(ND_BLOCK);
 	}
 
-	Node *node = assign();
-	return node;
+	return assign();
 }
 
 static Node *assign() {
@@ -168,7 +196,6 @@ static Node *add() {
 	for (;;) {
 		if (equal(CurrentToken(), "+")) {
 			NextToken();
-			print("hit -- add");
 			node = new_binary(ND_ADD, node, mul());
 			continue;
 		}
@@ -328,6 +355,7 @@ static unsigned int n_byte_length;
 static unsigned char *c = 0;
 
 static int depth = 0;
+static int count = 0;
 
 static void _gen_expr(Node *node) {
 	switch (node->kind) {
@@ -385,9 +413,25 @@ static void _gen_expr(Node *node) {
 			return;
 		} break;
 		case ND_RETURN: {
-			print("ND_RETURN");
 			_gen_expr(node->lhs);
+			print("OP_RETURN");
 			c[n_byte_length++] = OP_RETURN;
+			return;
+		}
+		case ND_IF: {
+			++count;
+			_gen_expr(node->condition);
+			c[n_byte_length++] = OP_IF;
+			c[n_byte_length++] = 0x40;
+			print("OP_IF");
+			_gen_expr(node->then);
+			if (node->els) {
+				c[n_byte_length++] = OP_ELSE;
+				_gen_expr(node->els);
+			}
+			c[n_byte_length++] = OP_END;
+			c[n_byte_length++] = OP_I32_CONST;
+			c[n_byte_length++] = 0;
 			return;
 		}
 	}
@@ -462,6 +506,7 @@ void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *output_c
 	n_byte_length = *byte_length;
 	c = output_code;
 	depth = 0;
+	count = 0;
 
 	assign_lvar_offsets(prog);
 
