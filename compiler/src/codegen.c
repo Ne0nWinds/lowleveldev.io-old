@@ -354,18 +354,18 @@ void print_tree(Node *node) {
 static unsigned int n_byte_length;
 static unsigned char *c = 0;
 
-static int depth = 0;
 static int count = 0;
 
-static void _gen_expr(Node *node) {
+static void _gen_expr(Node *node, int *depth) {
 	switch (node->kind) {
 		case ND_BLOCK: {
+			int _depth = 0;
 			for (Node *n = node->body; n; n = n->next) {
-				_gen_expr(n);
-				if (n->next && depth) {
-					print("OP_DROP");
+				_gen_expr(n, &_depth);
+				if (n->next && _depth) {
+					printf("OP_DROP - depth: %d", _depth);
 					c[n_byte_length++] = OP_DROP;
-					--depth;
+					--_depth;
 				}
 			}
 			return;
@@ -374,11 +374,11 @@ static void _gen_expr(Node *node) {
 			c[n_byte_length++] = OP_I32_CONST;
 			EncodeLEB128(c + n_byte_length, node->val, n_byte_length);
 			printf("OP_I32_CONST: %d\n", node->val);
-			++depth;
+			*depth += 1;
 			return;
 		} break;
 		case ND_NEG: {
-			_gen_expr(node->lhs);
+			_gen_expr(node->lhs, depth);
 			c[n_byte_length++] = OP_I32_CONST;
 			EncodeLEB128(c + n_byte_length, -1, n_byte_length);
 			printf("OP_I32_CONST: %d\n", -1);
@@ -387,7 +387,6 @@ static void _gen_expr(Node *node) {
 			return;
 		} break;
 		case ND_VAR: {
-			print("ND_VAR");
 			printf("Name: %s", node->var->name);
 			c[n_byte_length++] = OP_I32_CONST;
 			c[n_byte_length++] = 0;
@@ -396,7 +395,7 @@ static void _gen_expr(Node *node) {
 			c[n_byte_length++] = 2;
 			EncodeLEB128(c + n_byte_length, node->var->offset, n_byte_length);
 			printf("OP_I32_LOAD: %d", node->var->offset);
-			++depth;
+			*depth += 1;
 			return;
 		} break;
 		case ND_ASSIGN: {
@@ -404,30 +403,36 @@ static void _gen_expr(Node *node) {
 			c[n_byte_length++] = OP_I32_CONST;
 			c[n_byte_length++] = 0;
 			printf("OP_I32_CONST: %d\n", 0);
-			_gen_expr(node->rhs);
+			_gen_expr(node->rhs, depth);
 			c[n_byte_length++] = OP_I32_STORE;
 			c[n_byte_length++] = 2;
 			EncodeLEB128(c + n_byte_length, node->lhs->var->offset, n_byte_length);
 			printf("OP_I32_STORE: %d", node->lhs->var->offset);
-			--depth;
+			*depth -= 1;
 			return;
 		} break;
 		case ND_RETURN: {
-			_gen_expr(node->lhs);
+			_gen_expr(node->lhs, depth);
 			print("OP_RETURN");
 			c[n_byte_length++] = OP_RETURN;
 			return;
 		}
 		case ND_IF: {
 			++count;
-			_gen_expr(node->condition);
+			int _depth;
+			_gen_expr(node->condition, &_depth);
+			c[n_byte_length++] = OP_I32_CONST;
+			c[n_byte_length++] = 0;
+			c[n_byte_length++] = OP_I32_NE;
 			c[n_byte_length++] = OP_IF;
 			c[n_byte_length++] = 0x40;
 			print("OP_IF");
-			_gen_expr(node->then);
+			_depth = 0;
+			_gen_expr(node->then, depth);
 			if (node->els) {
+				_depth = 0;
 				c[n_byte_length++] = OP_ELSE;
-				_gen_expr(node->els);
+				_gen_expr(node->els, depth);
 			}
 			c[n_byte_length++] = OP_END;
 			c[n_byte_length++] = OP_I32_CONST;
@@ -436,59 +441,59 @@ static void _gen_expr(Node *node) {
 		}
 	}
 
-	_gen_expr(node->lhs);
-	_gen_expr(node->rhs);
+	_gen_expr(node->lhs, depth);
+	_gen_expr(node->rhs, depth);
 
 	switch (node->kind) {
 		case ND_ADD: {
 			c[n_byte_length++] = OP_I32_ADD;
 			print("OP_I32_ADD");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_SUB: {
 			c[n_byte_length++] = OP_I32_SUB;
 			print("OP_I32_SUB");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_MUL: {
 			c[n_byte_length++] = OP_I32_MUL;
 			print("OP_I32_MUL");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_DIV: {
 			c[n_byte_length++] = OP_I32_DIV_U;
 			print("OP_I32_DIV");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_EQ: {
 			c[n_byte_length++] = OP_I32_EQ;
 			print("OP_I32_EQ");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_NE: {
 			c[n_byte_length++] = OP_I32_NE;
 			print("OP_I32_NE");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_LT: {
 			c[n_byte_length++] = OP_I32_LT_S;
 			print("OP_I32_LT");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_LE: {
 			c[n_byte_length++] = OP_I32_LE_S;
 			print("OP_I32_LE");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_GT: {
 			c[n_byte_length++] = OP_I32_GT_S;
 			print("OP_I32_GT");
-			--depth;
+			*depth -= 1;
 		} break;
 		case ND_GE: {
 			c[n_byte_length++] = OP_I32_GE_S;
 			print("OP_I32_GE");
-			--depth;
+			*depth -= 1;
 		} break;
 	}
 }
@@ -505,17 +510,19 @@ static void assign_lvar_offsets(Function *prog) {
 void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *output_code) {
 	n_byte_length = *byte_length;
 	c = output_code;
-	depth = 0;
 	count = 0;
 
 	assign_lvar_offsets(prog);
 
-	_gen_expr(prog->body);
-
+	int depth = 0;
+	_gen_expr(prog->body, &depth);
 	if (depth == 0) {
 		c[n_byte_length++] = OP_I32_CONST;
 		c[n_byte_length++] = 0;
+		c[n_byte_length++] = OP_RETURN;
+		print("Adding 0 as default result");
 		printf("OP_I32_CONST: %d\n", 0);
 	}
+
 	*byte_length = n_byte_length;
 }
