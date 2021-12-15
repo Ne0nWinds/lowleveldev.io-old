@@ -120,6 +120,51 @@ static Node *new_expr() {
 
 static Node *expr_or_block() {
 	Node *node = 0;
+
+	if (equal(CurrentToken(), ";")) {
+		NextToken();
+		return node;
+	}
+
+	if (equal(CurrentToken(), "if")) {
+		NextToken();
+		node = new_node(ND_IF);
+		skip("(");
+		node->_if.condition = expr();
+		skip(")");
+		node->_if.then = expr_or_block();
+		node->_if.els = 0;
+		if (equal(CurrentToken(), "else")) {
+			NextToken();
+			node->_if.els = expr_or_block();
+		}
+		return node;
+	}
+
+	if (equal(CurrentToken(), "for")) {
+		NextToken();
+		skip("(");
+		node = new_node(ND_FOR);
+		if (!equal(CurrentToken(), ";"))
+			node->_for.init = expr();
+		skip(";");
+		if (!equal(CurrentToken(), ";"))
+			node->_for.condition = expr();
+		skip(";");
+		if (!equal(CurrentToken(), ")"))
+			node->_for.increment = expr();
+		skip(")");
+		node->_for.then = expr_or_block();
+		return node;
+	}
+
+	if (equal(CurrentToken(), "return")) {
+		NextToken();
+		node = new_unary(ND_RETURN, assign());
+		skip(";");
+		return node;
+	}
+
 	if (equal(CurrentToken(), "{")) {
 		NextToken();
 		node = complex_expr();
@@ -134,27 +179,14 @@ static Node *complex_expr() {
 	Node head = {};
 	Node *current = &head;
 
-	while (!equal(CurrentToken(), "}") && !error_parsing) {
+	while (*CurrentToken()->loc != '}' && !error_parsing) {
 		if (equal(CurrentToken(), "{")) {
 			NextToken();
 			current = current->next = complex_expr();
-		} else if (equal(CurrentToken(), "if")) {
-			NextToken();
-			Node *node = new_node(ND_IF);
-			skip("(");
-			node->condition = expr();
-			skip(")");
-			node->then = expr_or_block();
-			node->els = 0;
-			if (equal(CurrentToken(), "else")) {
-				NextToken();
-				node->els = expr_or_block();
-			}
-			current = current->next = node;
-		} else {
-			current = current->next = expr();
-			skip(";");
+			continue;
 		}
+
+		current = current->next = expr_or_block();
 	}
 
 	skip("}");
@@ -166,13 +198,6 @@ static Node *complex_expr() {
 
 static Node *expr() {
 	Node *node = 0;
-	if (CurrentToken()->kind == TK_KEYWORD) {
-		if (equal(CurrentToken(), "return")) {
-			NextToken();
-			node = new_unary(ND_RETURN, assign());
-			return node;
-		}
-	}
 
 	if (equal(CurrentToken(), ";")) {
 		return new_node(ND_BLOCK);
@@ -368,6 +393,7 @@ static void _gen_expr(Node *node, int *depth) {
 					--_depth;
 				}
 			}
+			*depth = _depth;
 			return;
 		}
 		case ND_NUM: {
@@ -419,8 +445,8 @@ static void _gen_expr(Node *node, int *depth) {
 		}
 		case ND_IF: {
 			++count;
-			int _depth;
-			_gen_expr(node->condition, &_depth);
+			int _depth = 0;
+			_gen_expr(node->_if.condition, &_depth);
 			c[n_byte_length++] = OP_I32_CONST;
 			c[n_byte_length++] = 0;
 			c[n_byte_length++] = OP_I32_NE;
@@ -428,15 +454,51 @@ static void _gen_expr(Node *node, int *depth) {
 			c[n_byte_length++] = 0x40;
 			print("OP_IF");
 			_depth = 0;
-			_gen_expr(node->then, depth);
-			if (node->els) {
+			_gen_expr(node->_if.then, &_depth);
+			if (node->_if.els) {
 				_depth = 0;
 				c[n_byte_length++] = OP_ELSE;
-				_gen_expr(node->els, depth);
+				_gen_expr(node->_if.els, &_depth);
 			}
 			c[n_byte_length++] = OP_END;
-			c[n_byte_length++] = OP_I32_CONST;
-			c[n_byte_length++] = 0;
+			return;
+		}
+		case ND_FOR: {
+			int _depth = 0;
+			if (node->_for.init)
+				_gen_expr(node->_for.init, &_depth);
+			if (node->_for.condition) {
+				c[n_byte_length++] = OP_BLOCK;
+				c[n_byte_length++] = 0x40;
+				_depth = 0;
+				_gen_expr(node->_for.condition, &_depth);
+				c[n_byte_length++] = OP_I32_CONST;
+				c[n_byte_length++] = 0;
+				c[n_byte_length++] = OP_I32_EQ;
+				c[n_byte_length++] = OP_BRANCH_IF;
+				c[n_byte_length++] = 0;
+			}
+			c[n_byte_length++] = OP_LOOP;
+			c[n_byte_length++] = 0x40;
+			_depth = 0;
+			if (node->_for.then)
+				_gen_expr(node->_for.then, &_depth);
+			if (node->_for.increment)
+				_gen_expr(node->_for.increment, &_depth);
+			if (node->_for.condition) {
+				_depth = 0;
+				_gen_expr(node->_for.condition, &_depth);
+				c[n_byte_length++] = OP_I32_CONST;
+				c[n_byte_length++] = 0;
+				c[n_byte_length++] = OP_I32_NE;
+				c[n_byte_length++] = OP_BRANCH_IF;
+				c[n_byte_length++] = 0;
+				c[n_byte_length++] = OP_END;
+			} else {
+				c[n_byte_length++] = OP_BRANCH;
+				c[n_byte_length++] = 0;
+			}
+			c[n_byte_length++] = OP_END;
 			return;
 		}
 	}
@@ -516,6 +578,7 @@ void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *output_c
 
 	int depth = 0;
 	_gen_expr(prog->body, &depth);
+	printf("depth: %d", depth);
 	if (depth == 0) {
 		c[n_byte_length++] = OP_I32_CONST;
 		c[n_byte_length++] = 0;

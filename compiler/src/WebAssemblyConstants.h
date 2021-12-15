@@ -54,9 +54,14 @@ enum OpCode {
 	OP_I32_LOAD = 0x28,
 	OP_I32_STORE = 0x36,
 
+	OP_NONE = 0x01,
+	OP_BLOCK = 0x02,
+	OP_LOOP = 0x03,
 	OP_IF = 0x04,
 	OP_ELSE = 0x05,
 	OP_RETURN = 0x0F,
+	OP_BRANCH = 0x0C,
+	OP_BRANCH_IF = 0x0D,
 	OP_END = 0x0B
 };
 

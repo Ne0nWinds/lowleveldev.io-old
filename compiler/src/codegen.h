@@ -18,7 +18,8 @@ typedef enum {
 	ND_RETURN,
 	ND_VAR,
 	ND_BLOCK,
-	ND_IF
+	ND_IF,
+	ND_FOR
 } NodeKind;
 
 typedef struct Node Node;
@@ -32,9 +33,20 @@ struct Node {
 	Node *rhs;
 	Node *body;
 
-	Node *condition;
-	Node *then;
-	Node *els;
+	// complex statements
+	union {
+		struct _if {
+			Node *condition;
+			Node *then;
+			Node *els;
+		} _if;
+		struct _for {
+			Node *init;
+			Node *condition;
+			Node *increment;
+			Node *then;
+		} _for;
+	};
 
 	union {
 		Obj *var; // ND_VAR

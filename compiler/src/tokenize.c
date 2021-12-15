@@ -55,9 +55,9 @@ static bool is_ident2(char c) {
 }
 
 static bool is_keyword(const char *c, const unsigned int c_len) {
-	static char *kw[] = {"return", "if", "else"};
+	static char *kw[] = {"return", "if", "else", "for"};
 	for (int i = 0; i < len(kw); ++i) {
-		if (!strncmp(c, kw[i], c_len))
+		if (!strncmp(c, kw[i], c_len + 1))
 			return true;
 	}
 	return false;
