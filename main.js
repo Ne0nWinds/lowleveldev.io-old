@@ -1,11 +1,15 @@
 import compiler from "./compiler.js"
 
 const editor = document.getElementById("editor");
+const compile_button = document.getElementById("compile_button");
+
+compile_button.onclick = () => {
+	compile(editor.value);
+}
 
 let timeoutId = 0;
 editor.oninput = () => {
 	clearTimeout(timeoutId);
-	// compile(editor.value);
 	timeoutId = setTimeout(() => compile(editor.value), 650);
 }
 
@@ -37,7 +41,18 @@ const test_cases = [
 	['{ 1; 2; return 3; }', 3],
 	['{ a = 16; b = 2; return (a * b) - 8; 1024 - 67; }', 24],
 	['{ {1; {2;} return 3; }}', 3],
-	['{ a = 1; }', 0]
+	['{ a = 1; }', 0],
+	['{ if (1 > 0) return 5; }', 5],
+	['{ if (0) return 5; else return 27; }', 27],
+	['{ a = 5; b = 10; if (a * b == 50) return 28; else return 92;}', 28],
+	['{ a = 5; b = 10; if (a * b == 52) { return a; } else { return b; }}', 10],
+	['{ a = 5; b = 10; if (a * b == 52) { return a; } else { a = 10; return b; }}', 10],
+	['{ a = 5; {1; { a = 2;} return 3; }}', 3],
+	['{ for (i = 0; i < 5; i = i + 1); return i; }', 5],
+	['{ for (i = 0; i < 5;) { i = i + 1; } return i; }', 5],
+	['{ for (;;) { return 3; } }', 3],
+	['{ for (;;) { return 3; } return 5; }', 3],
+	['{ i = 0; for (;;) { 2 + 2; i = i + 1; if (i > 10) return i; } }', 11]
 ];
 
 const encoder = new TextEncoder('utf-8');
