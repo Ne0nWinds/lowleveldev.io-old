@@ -158,6 +158,16 @@ static Node *expr_or_block() {
 		return node;
 	}
 
+	if (equal(CurrentToken(), "while")) {
+		NextToken();
+		skip("(");
+		node = new_node(ND_FOR);
+		node->_for.condition = expr();
+		skip(")");
+		node->_for.then = expr_or_block();
+		return node;
+	}
+
 	if (equal(CurrentToken(), "return")) {
 		NextToken();
 		node = new_unary(ND_RETURN, assign());

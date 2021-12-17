@@ -52,7 +52,8 @@ const test_cases = [
 	['{ for (i = 0; i < 5;) { i = i + 1; } return i; }', 5],
 	['{ for (;;) { return 3; } }', 3],
 	['{ for (;;) { return 3; } return 5; }', 3],
-	['{ i = 0; for (;;) { 2 + 2; i = i + 1; if (i > 10) return i; } }', 11]
+	['{ i = 0; for (;;) { 2 + 2; i = i + 1; if (i > 10) return i; } }', 11],
+	['{ i = 0;\n while (i < 5) { i = i + 1; }\n return i; }', 5],
 ];
 
 const encoder = new TextEncoder('utf-8');
