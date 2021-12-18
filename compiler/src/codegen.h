@@ -1,4 +1,5 @@
 #pragma once
+#include "tokenize.h"
 
 typedef enum {
 	ND_ADD,
@@ -19,7 +20,9 @@ typedef enum {
 	ND_VAR,
 	ND_BLOCK,
 	ND_IF,
-	ND_FOR
+	ND_FOR,
+	ND_ADDR,
+	ND_DEREF
 } NodeKind;
 
 typedef struct Node Node;
@@ -32,6 +35,7 @@ struct Node {
 	Node *lhs;
 	Node *rhs;
 	Node *body;
+	Token *tok;
 
 	// complex statements
 	union {

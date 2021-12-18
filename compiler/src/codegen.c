@@ -13,6 +13,7 @@ static int align_to(int n, int align) {
 static Node *new_node(NodeKind kind) {
 	Node *node = CurrentNode++;
 	node->kind = kind;
+	node->tok = (struct Token *)CurrentToken();
 	return node;
 }
 
@@ -325,6 +326,16 @@ static Node *unary() {
 		return new_unary(ND_NEG, unary());
 	}
 
+	if (equal(CurrentToken(), "&")) {
+		NextToken();
+		return new_unary(ND_ADDR, unary());
+	}
+
+	if (equal(CurrentToken(), "*")) {
+		NextToken();
+		return new_unary(ND_DEREF, unary());
+	}
+
 	return primary();
 }
 
@@ -469,9 +480,7 @@ static void _gen_expr(Node *node, int *depth) {
 				_depth = 0;
 				c[n_byte_length++] = OP_ELSE;
 				_gen_expr(node->_if.els, &_depth);
-			}
-			c[n_byte_length++] = OP_END;
-			return;
+			} c[n_byte_length++] = OP_END; return;
 		}
 		case ND_FOR: {
 			int _depth = 0;
@@ -509,6 +518,19 @@ static void _gen_expr(Node *node, int *depth) {
 				c[n_byte_length++] = 0;
 			}
 			c[n_byte_length++] = OP_END;
+			return;
+		}
+		case ND_DEREF: {
+			_gen_expr(node->lhs, depth);
+			c[n_byte_length++] = OP_I32_LOAD;
+			c[n_byte_length++] = 2;
+			c[n_byte_length++] = 0;
+			return;
+		}
+		case ND_ADDR: {
+			c[n_byte_length++] = OP_I32_CONST;
+			EncodeLEB128(c + n_byte_length, node->lhs->var->offset, n_byte_length);
+			*depth += 1;
 			return;
 		}
 	}

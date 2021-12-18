@@ -54,6 +54,8 @@ const test_cases = [
 	['{ for (;;) { return 3; } return 5; }', 3],
 	['{ i = 0; for (;;) { 2 + 2; i = i + 1; if (i > 10) return i; } }', 11],
 	['{\n\ti = 0;\n\twhile (i < 5) {\n\t\ti = i + 1;\n\t}\n\treturn i;\n}', 5],
+	['{ x = 3; return *&x; }', 3],
+	['{ x = 3; y = &x; z = &y; return **z; }', 3],
 ];
 
 const encoder = new TextEncoder('utf-8');
