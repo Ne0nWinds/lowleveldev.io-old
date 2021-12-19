@@ -1,21 +1,5 @@
 #include "standard_functions.h"
 
-__attribute__((always_inline))
-void *memset(void *str, int c, unsigned int n) {
-	for (int i; i < n; ++i) {
-		((unsigned char *)str)[i] = c;
-	}
-
-	return str;
-}
-
-void *memcpy(void * restrict dest, const void * restrict src, unsigned int n) {
-	for (unsigned int i = 0; i < n; ++i) {
-		((unsigned char *)dest)[i] = ((unsigned char *)src)[i];
-	}
-	return dest;
-}
-
 unsigned int strlen(const char *str) {
 	unsigned int n = 0;
 	while (*str++) ++n;

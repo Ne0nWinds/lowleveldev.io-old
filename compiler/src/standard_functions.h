@@ -1,7 +1,7 @@
 #pragma once
 #include "defines.h"
-void *memset(void *str, int c, unsigned int n);
-void *memcpy(void * restrict dest, const void * restrict src, unsigned int n);
+#define memset(str, c, n) __builtin_memset(str, c, n)
+#define memcpy(dst, src, n) __builtin_memcpy(dst, src, n)
 unsigned int strlen(const char *str);
 int strncmp(const char *str1, const char *str2, unsigned int num);
 bool startswith(const char *p, const char *q);
