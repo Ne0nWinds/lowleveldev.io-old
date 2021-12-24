@@ -1,5 +1,6 @@
 #pragma once
 #include "tokenize.h"
+#include "defines.h"
 
 typedef enum {
 	ND_ADD,
@@ -25,9 +26,15 @@ typedef enum {
 	ND_DEREF
 } NodeKind;
 
+typedef enum {
+	TYPE_INT = 1,
+	TYPE_PTR,
+} TypeKind;
+
 typedef struct Node Node;
 typedef struct Obj Obj;
 typedef struct Function Function;
+typedef struct Type Type;
 
 struct Node {
 	NodeKind kind;
@@ -36,6 +43,7 @@ struct Node {
 	Node *rhs;
 	Node *body;
 	Token *tok;
+	Type *type;
 
 	// complex statements
 	union {
@@ -69,6 +77,13 @@ struct Function {
 	int stack_size;
 };
 
+struct Type {
+	TypeKind kind;
+	Type *base;
+};
+
 void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *c);
 Function *ParseTokens();
 void print_tree(Node *node);
+
+void add_type(Node *node);

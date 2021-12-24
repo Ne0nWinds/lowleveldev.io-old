@@ -4,13 +4,14 @@ const ENABLE_TEST_CASES = 1;
 
 const editor = document.getElementById("editor");
 const compile_button = document.getElementById("compile_button");
+const wasm_exp_button = document.getElementById("wasm_explorer");
 
 let program = null;
+let binary = null;
 
 let timeoutId = 0;
 editor.oninput = async () => {
 	program = await compile(editor.value);
-	console.log(program);
 }
 await editor.oninput();
 
@@ -21,6 +22,27 @@ compile_button.onclick = () => {
 window.onkeypress = (e) => {
 	if (e.code == "Enter" && e.ctrlKey)
 		compile_button.onclick();
+}
+
+let binaryExplorerEventListener = null;
+wasm_explorer.onclick = async () => {
+	if (binary && !binaryExplorerEventListener) {
+		const dst = "https://wasdk.github.io/wasmcodeexplorer/?api=postmessage";
+		const windowName = "BinaryExplorer";
+		window.open(dst, "Binary Explorer", "popup");
+		const binaryCopy = new Uint8Array(binary);
+		binaryExplorerEventListener = (e) => {
+			if (e.data.type == "wasmexplorer-ready") {
+				window.removeEventListener("message", binaryExplorerEventListener, false);
+				binaryExplorerEventListener = null;
+				e.source.postMessage({
+					type: "wasmexplorer-load",
+					data: binaryCopy
+				}, "*", [binaryCopy.buffer]);
+			}
+		};
+		window.addEventListener("message", binaryExplorerEventListener, false);
+	}
 }
 
 async function compile(value) {
@@ -37,11 +59,10 @@ async function compile(value) {
 		return;
 	}
 
-	const view2 = new Uint8Array(compiler.memory.buffer, compiler.get_compiled_code(), len);
+	binary = new Uint8Array(compiler.memory.buffer, compiler.get_compiled_code(), len);
 	const compilationToWebAssembly = performance.now();
-	console.log(view2);
 
-	const { instance } = await WebAssembly.instantiate(view2);
+	const { instance } = await WebAssembly.instantiate(binary);
 	const webAssemblyToX86 = performance.now();
 	console.log("Compilation to WebAssembly -- %.3fms", compilationToWebAssembly - start);
 	console.log("WebAssembly to x86 -- %.3fms", webAssemblyToX86 - compilationToWebAssembly);
@@ -94,6 +115,8 @@ if (ENABLE_TEST_CASES) {
 		['{\n\ti = 0;\n\twhile (i < 5) {\n\t\ti = i + 1;\n\t}\n\treturn i;\n}', 5],
 		['{ x = 3; return *&x; }', 3],
 		['{ x = 3; y = &x; z = &y; x = x + 1; return **z; }', 4],
+		['{ x = 0; y = &x; *y = 1; return x; }', 1],
+		['{ x = 10; y = &x; *y = 22; return x; }', 22]
 	];
 
 	void async function() {
@@ -109,6 +132,7 @@ if (ENABLE_TEST_CASES) {
 			}
 			if (compile_result != test_cases[i][1]) {
 				console.log("== Failed Test Case ==\n'%s' should return %d", test_cases[i][0], test_cases[i][1]);
+				console.log("Actual Result: %d", compile_result);
 				break;
 			}
 		}

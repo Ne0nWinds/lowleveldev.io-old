@@ -6,6 +6,8 @@ Node AllNodes[512] = {0};
 Node *CurrentNode = AllNodes;
 static bool error_parsing = false;
 
+static Type TypeInt = (Type){TYPE_INT, 0};
+
 static int align_to(int n, int align) {
 	return (n + align - 1) / align * align;
 }
@@ -34,6 +36,64 @@ static Node *new_num(int val) {
 	Node *node = new_node(ND_NUM);
 	node->val = val;
 	return node;
+}
+
+#define is_int(n) (n->type->kind == TYPE_INT)
+static Node *new_add(Node *lhs, Node *rhs) {
+	add_type(lhs);
+	add_type(rhs);
+	
+	// num + num
+	if (is_int(lhs) && is_int(rhs))
+		return new_binary(ND_ADD, lhs, rhs);
+
+	// ptr + ptr
+	if (lhs->type->base && rhs->type->base) {
+		error_tok(CurrentToken(), "invalid operands");
+		error_parsing = true;
+		return 0;
+	}
+
+	// num + ptr
+	if (!lhs->type->base && rhs->type->base) {
+		Node *tmp = lhs;
+		lhs = rhs;
+		rhs = tmp;
+	}
+
+	// ptr + num
+	rhs = new_binary(ND_MUL, rhs, new_num(4));
+	return new_binary(ND_ADD, lhs, rhs);
+}
+
+static Node *new_sub(Node *lhs, Node *rhs) {
+	add_type(lhs);
+	add_type(rhs);
+
+	// num - num
+	if (is_int(lhs) && is_int(rhs))
+		return new_binary(ND_SUB, lhs, rhs);
+
+	// ptr - num
+	if (lhs->type->base && is_int(rhs)) {
+		rhs = new_binary(ND_MUL, rhs, new_num(4));
+		add_type(rhs);
+		Node *node = new_binary(ND_SUB, lhs, rhs);
+		node->type = lhs->type;
+		return node;
+	}
+
+	// ptr - ptr
+	if (lhs->type->base && rhs->type->base) {
+		Node *node = new_binary(ND_SUB, lhs, rhs);
+		node->type = &TypeInt;
+		return new_binary(ND_DIV, node, new_num(4));
+	}
+
+	// num - ptr
+	error_tok(CurrentToken(), "invalid operands");
+	error_parsing = true;
+	return 0;
 }
 
 static Obj Locals[512];
@@ -232,13 +292,13 @@ static Node *add() {
 	for (;;) {
 		if (equal(CurrentToken(), "+")) {
 			NextToken();
-			node = new_binary(ND_ADD, node, mul());
+			node = new_add(node, mul());
 			continue;
 		}
 
 		if (equal(CurrentToken(), "-")) {
 			NextToken();
-			node = new_binary(ND_SUB, node, mul());
+			node = new_sub(node, mul());
 			continue;
 		}
 
@@ -368,6 +428,57 @@ static Node *primary() {
 	return 0;
 }
 
+static Type Types[128] = {0};
+static Type *CurrentType;
+Type *pointer_to(Type *base) {
+	Type *type = CurrentType++;
+	type->kind = TYPE_PTR;
+	type->base = base;
+	return type;
+}
+
+void add_type(Node *node) {
+	if (!node || node->type)
+		return;
+	
+	add_type(node->lhs);
+	add_type(node->rhs);
+	add_type(node->_for.init);
+	add_type(node->_for.condition);
+	add_type(node->_for.increment);
+	add_type(node->_for.then);
+
+	switch (node->kind) {
+		case ND_ADD:
+		case ND_SUB:
+		case ND_MUL:
+		case ND_DIV:
+		case ND_NEG:
+		case ND_ASSIGN:
+			node->type = node->lhs->type;
+			return;
+		case ND_EQ:
+		case ND_NE:
+		case ND_GT:
+		case ND_GE:
+		case ND_LT:
+		case ND_LE:
+		case ND_VAR:
+		case ND_NUM:
+			node->type = &TypeInt;
+			return;
+		case ND_ADDR:
+			node->type = pointer_to(node->lhs->type);
+			return;
+		case ND_DEREF:
+			if (node->lhs->type->kind == TYPE_PTR)
+				node->type = node->lhs->type->base;
+			else
+				node->type = &TypeInt;
+			return;
+	}
+}
+
 static char *NodeKind_str[] = {
 	"ND_ADD",
 	"ND_SUB",
@@ -381,7 +492,15 @@ static char *NodeKind_str[] = {
 	"ND_LE",
 	"ND_GT",
 	"ND_GE",
-	"ND_EXPR"
+	"ND_EXPR",
+	"ND_ASSIGN",
+	"ND_RETURN",
+	"ND_VAR",
+	"ND_BLOCK",
+	"ND_IF",
+	"ND_FOR",
+	"ND_ADDR",
+	"ND_DEREF"
 };
 
 static void _print_tree(Node *node) {
@@ -446,15 +565,26 @@ static void _gen_expr(Node *node, int *depth) {
 			return;
 		} break;
 		case ND_ASSIGN: {
-			print("ND_ASSIGN");
-			c[n_byte_length++] = OP_I32_CONST;
-			c[n_byte_length++] = 0;
 			printf("OP_I32_CONST: %d\n", 0);
-			_gen_expr(node->rhs, depth);
-			c[n_byte_length++] = OP_I32_STORE;
-			c[n_byte_length++] = 2;
-			EncodeLEB128(c + n_byte_length, node->lhs->var->offset, n_byte_length);
-			printf("OP_I32_STORE: %d", node->lhs->var->offset);
+			const Node *lhs = node->lhs;
+			if (lhs->kind == ND_VAR) {
+				c[n_byte_length++] = OP_I32_CONST;
+				c[n_byte_length++] = 0;
+				_gen_expr(node->rhs, depth);
+				c[n_byte_length++] = OP_I32_STORE;
+				c[n_byte_length++] = 2;
+				EncodeLEB128(c + n_byte_length, lhs->var->offset, n_byte_length);
+				printf("OP_I32_STORE: %d", lhs->var->offset);
+			} else if (lhs->kind == ND_DEREF) {
+				int _depth = 0;
+				_gen_expr(lhs->lhs, &_depth);
+				_gen_expr(node->rhs, depth);
+				c[n_byte_length++] = OP_I32_STORE;
+				c[n_byte_length++] = 2;
+				c[n_byte_length++] = 0;
+			} else {
+				print("Well fuck!");
+			}
 			*depth -= 1;
 			return;
 		} break;
@@ -605,6 +735,7 @@ void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *output_c
 	n_byte_length = *byte_length;
 	c = output_code;
 	count = 0;
+	CurrentType = Types;
 
 	assign_lvar_offsets(prog);
 
