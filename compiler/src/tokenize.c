@@ -55,9 +55,9 @@ static bool is_ident2(char c) {
 }
 
 static bool is_keyword(const char *c, const unsigned int c_len) {
-	static char *kw[] = {"return", "if", "else", "for", "while"};
+	static const char *kw[] = {"return", "if", "else", "for", "while", "int"};
 	for (int i = 0; i < len(kw); ++i) {
-		if (!strncmp(c, kw[i], c_len + 1))
+		if (!strncmp(c, kw[i], strlen(kw[i])))
 			return true;
 	}
 	return false;
@@ -103,4 +103,3 @@ Token *tokenize(char *p) {
 	new_token(TK_EOF, p, 0);
 	return AllTokens;
 }
-

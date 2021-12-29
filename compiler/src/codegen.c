@@ -145,6 +145,7 @@ static Node *relational();
 static Node *add();
 static Node *assign();
 static Node *complex_expr();
+static Node *declaration();
 
 static Obj *find_var(const Token *tok) {
 	for (Obj *var = Locals; var != CurrentLocal; ++var) {
@@ -188,8 +189,8 @@ static Node *expr_or_block() {
 	}
 
 	if (equal(CurrentToken(), "if")) {
-		NextToken();
 		node = new_node(ND_IF);
+		NextToken();
 		skip("(");
 		node->_if.condition = expr();
 		skip(")");
@@ -203,9 +204,9 @@ static Node *expr_or_block() {
 	}
 
 	if (equal(CurrentToken(), "for")) {
+		node = new_node(ND_FOR);
 		NextToken();
 		skip("(");
-		node = new_node(ND_FOR);
 		if (!equal(CurrentToken(), ";"))
 			node->_for.init = expr();
 		skip(";");
@@ -220,9 +221,9 @@ static Node *expr_or_block() {
 	}
 
 	if (equal(CurrentToken(), "while")) {
+		node = new_node(ND_FOR);
 		NextToken();
 		skip("(");
-		node = new_node(ND_FOR);
 		node->_for.condition = expr();
 		skip(")");
 		node->_for.then = expr_or_block();
@@ -272,6 +273,11 @@ static Node *expr() {
 
 	if (equal(CurrentToken(), ";")) {
 		return new_node(ND_BLOCK);
+	}
+
+	if (equal(CurrentToken(), "int")) {
+		node = declaration();
+		return node;
 	}
 
 	return assign();
@@ -415,8 +421,11 @@ static Node *primary() {
 
 	if (CurrentToken()->kind == TK_IDENTIFIER) {
 		Obj *var = find_var(CurrentToken());
-		if (!var)
-			var = new_lvar(CurrentToken()->loc, CurrentToken()->len);
+		if (!var) {
+			error_tok(CurrentToken(), "undefined variable");
+			error_parsing = true;
+			return 0;
+		}
 		NextToken();
 		return new_variable(var);
 	}
@@ -426,6 +435,56 @@ static Node *primary() {
 	error_tok(CurrentToken(), "expected an expression");
 	error_parsing = true;
 	return 0;
+}
+
+Type *pointer_to(Type *base);
+
+static Type *declspec() {
+	skip("int");
+	return &TypeInt;
+}
+
+static Type *declarator(Type *type) {
+	while (equal(CurrentToken(), "*")) {
+		type = pointer_to(type);
+		NextToken();
+	}
+
+	type->name = (Token *)CurrentToken();
+	
+	return type;
+}
+
+static Node *declaration() {
+	Type *base_type = declspec();
+
+	Node head = {};
+	Node *current = &head;
+	bool first_loop = true;
+
+	while (!equal(CurrentToken(), ";")) {
+		if (first_loop)
+			first_loop = false;
+		else
+			skip(",");
+
+		Type *type = declarator(base_type);
+		Obj *var = new_lvar(CurrentToken()->loc, CurrentToken()->len);
+		NextToken();
+
+		if (!equal(CurrentToken(), "="))
+			continue;
+
+		Node *lhs = new_variable(var);
+		NextToken();
+		Node *rhs = assign();
+		Node *node = new_binary(ND_ASSIGN, lhs, rhs);
+		current = current->next = node;
+	}
+
+	Node *node = new_node(ND_BLOCK);
+	node->body = head.next;
+	return node;
 }
 
 static Type Types[128] = {0};

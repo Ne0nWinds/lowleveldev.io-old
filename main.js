@@ -13,7 +13,7 @@ let timeoutId = 0;
 editor.oninput = async () => {
 	program = await compile(editor.value);
 }
-await editor.oninput();
+// await editor.oninput();
 
 compile_button.onclick = () => {
 	const result = program.main();
@@ -90,33 +90,33 @@ if (ENABLE_TEST_CASES) {
 		['{ return 0 >= - 1; }', 1],
 		['{ return -1 > -129; }', 1],
 		['{ 1; return 2; }', 2],
-		['{ a = 3; return a; }', 3],
-		['{ a = 15; b = 25 * 3; return b - a + 1; }', 61],
-		['{ test_var = 14; return test_var; }', 14],
-		['{ var1 = 30; var2 = 32; return var2 - var1; }', 2],
-		['{ var1 = 30; var2 = 32; return -(var2 - var1) + 10; }', 8],
+		['{ int a = 1; }', 0],
+		['{ int a = 3; return a; }', 3],
+		['{ int a = 15; int b = 25 * 3; return b - a + 1; }', 61],
+		['{ int test_var = 14; return test_var; }', 14],
+		['{ int var1 = 30; int var2 = 32; return var2 - var1; }', 2],
+		['{ int var1 = 30; int var2 = 32; return -(var2 - var1) + 10; }', 8],
 		['{ return 1; 2; 3; }', 1],
 		['{ 1; return 2; 3; }', 2],
 		['{ 1; 2; return 3; }', 3],
-		['{ a = 16; b = 2; return (a * b) - 8; 1024 - 67; }', 24],
+		['{ int a = 16; int b = 2; return (a * b) - 8; 1024 - 67; }', 24],
 		['{ {1; {2;} return 3; }}', 3],
-		['{ a = 1; }', 0],
 		['{ if (1 > 0) return 5; }', 5],
 		['{ if (0) return 5; else return 27; }', 27],
-		['{ a = 5; b = 10; if (a * b == 50) return 28; else return 92;}', 28],
-		['{ a = 5; b = 10; if (a * b == 52) { return a; } else { return b; }}', 10],
-		['{ a = 5; b = 10; if (a * b == 52) { return a; } else { a = 10; return b; }}', 10],
-		['{ a = 5; {1; { a = 2;} return 3; }}', 3],
-		['{ for (i = 0; i < 5; i = i + 1); return i; }', 5],
-		['{ for (i = 0; i < 5;) { i = i + 1; } return i; }', 5],
+		['{ int a = 5; int b = 10; if (a * b == 50) return 28; else return 92;}', 28],
+		['{ int a = 5; int b = 10; if (a * b == 52) { return a; } else { return b; }}', 10],
+		['{ int a = 5; int b = 10; if (a * b == 52) { return a; } else { a = 10; return b; }}', 10],
+		['{ int a = 5; {1; { a = 2;} return 3; }}', 3],
+		['{ for (int i = 0; i < 5; i = i + 1); return i; }', 5],
+		['{ for (int i = 0; i < 5;) { i = i + 1; } return i; }', 5],
 		['{ for (;;) { return 3; } }', 3],
 		['{ for (;;) { return 3; } return 5; }', 3],
-		['{ i = 0; for (;;) { 2 + 2; i = i + 1; if (i > 10) return i; } }', 11],
-		['{\n\ti = 0;\n\twhile (i < 5) {\n\t\ti = i + 1;\n\t}\n\treturn i;\n}', 5],
-		['{ x = 3; return *&x; }', 3],
-		['{ x = 3; y = &x; z = &y; x = x + 1; return **z; }', 4],
-		['{ x = 0; y = &x; *y = 1; return x; }', 1],
-		['{ x = 10; y = &x; *y = 22; return x; }', 22]
+		['{ int i = 0; for (;;) { 2 + 2; i = i + 1; if (i > 10) return i; } }', 11],
+		['{\n\tint i = 0;\n\twhile (i < 5) {\n\t\ti = i + 1;\n\t}\n\treturn i;\n}', 5],
+		['{ int x = 3; return *&x; }', 3],
+		['{ int x = 3; int *y = &x; int z = &y; x = x + 1; return **z; }', 4],
+		['{ int x = 0; int *y = &x; *y = 1; return x; }', 1],
+		['{ int x = 10; int *y = &x; *y = 22; return x; }', 22]
 	];
 
 	void async function() {

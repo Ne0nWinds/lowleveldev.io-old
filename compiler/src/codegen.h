@@ -80,6 +80,7 @@ struct Function {
 struct Type {
 	TypeKind kind;
 	Type *base;
+	Token *name;
 };
 
 void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *c);
