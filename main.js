@@ -116,7 +116,8 @@ if (ENABLE_TEST_CASES) {
 		['{ int x = 3; return *&x; }', 3],
 		['{ int x = 3; int *y = &x; int z = &y; x = x + 1; return **z; }', 4],
 		['{ int x = 0; int *y = &x; *y = 1; return x; }', 1],
-		['{ int x = 10; int *y = &x; *y = 22; return x; }', 22]
+		['{ int x = 10; int *y = &x; *y = 22; return x; }', 22],
+		['{ return ret15(); }', 15]
 	];
 
 	void async function() {

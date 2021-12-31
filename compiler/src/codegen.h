@@ -23,7 +23,8 @@ typedef enum {
 	ND_IF,
 	ND_FOR,
 	ND_ADDR,
-	ND_DEREF
+	ND_DEREF,
+	ND_FUNCCALL
 } NodeKind;
 
 typedef enum {
@@ -63,6 +64,7 @@ struct Node {
 	union {
 		Obj *var; // ND_VAR
 		int val; // ND_NUM
+		char *funcname; // ND FUNCCALL
 	};
 };
 

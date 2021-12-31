@@ -118,6 +118,15 @@ static Obj *new_lvar(char *name, unsigned int len) {
 	return var;
 }
 
+static char *new_funcname(char *name, unsigned int len) {
+	char *value = CurrentChar;
+	memcpy(CurrentChar, name, len);
+	CurrentChar += len;
+	*CurrentChar = 0;
+	CurrentChar += 1;
+	return value;
+}
+
 static bool equal(const Token *token, char *op) {
 	for (unsigned int i = 0; i < token->len; ++i) {
 		if (token->loc[i] != op[i]) return 0;
@@ -420,6 +429,15 @@ static Node *primary() {
 	}
 
 	if (CurrentToken()->kind == TK_IDENTIFIER) {
+		if (equal(CurrentToken() + 1, "(")) {
+			Node *node = new_node(ND_FUNCCALL);
+			node->funcname = new_funcname(CurrentToken()->loc, CurrentToken()->len);
+			NextToken();
+			skip("(");
+			skip(")");
+			return node;
+		}
+
 		Obj *var = find_var(CurrentToken());
 		if (!var) {
 			error_tok(CurrentToken(), "undefined variable");
@@ -524,6 +542,7 @@ void add_type(Node *node) {
 		case ND_LE:
 		case ND_VAR:
 		case ND_NUM:
+		case ND_FUNCCALL:
 			node->type = &TypeInt;
 			return;
 		case ND_ADDR:
@@ -719,6 +738,12 @@ static void _gen_expr(Node *node, int *depth) {
 		case ND_ADDR: {
 			c[n_byte_length++] = OP_I32_CONST;
 			EncodeLEB128(c + n_byte_length, node->lhs->var->offset, n_byte_length);
+			*depth += 1;
+			return;
+		}
+		case ND_FUNCCALL: {
+			c[n_byte_length++] = OP_CALL;
+			c[n_byte_length++] = 1;
 			*depth += 1;
 			return;
 		}

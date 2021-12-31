@@ -59,9 +59,12 @@ enum OpCode {
 	OP_LOOP = 0x03,
 	OP_IF = 0x04,
 	OP_ELSE = 0x05,
-	OP_RETURN = 0x0F,
 	OP_BRANCH = 0x0C,
 	OP_BRANCH_IF = 0x0D,
+	OP_BRANCH_TABLE = 0x0E,
+	OP_RETURN = 0x0F,
+	OP_CALL = 0x10,
+	OP_CALL_INDIRECT = 0x11,
 	OP_END = 0x0B
 };
 

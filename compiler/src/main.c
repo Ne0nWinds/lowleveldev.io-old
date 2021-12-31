@@ -50,10 +50,11 @@ extern unsigned int compile() {
 	c += 7;
 
 	c[0] = SECTION_FUNC;
-	c[1] = 0x2;
-	c[2] = 0x1;
+	c[1] = 0x3;
+	c[2] = 0x2;
 	c[3] = 0x0;
-	c += 4;
+	c[4] = 0x0;
+	c += 5;
 
 	c[0] = SECTION_MEMORY;
 	c[1] = 0x3;
@@ -100,11 +101,18 @@ extern unsigned int compile() {
 	c -= 5;
 
 	c[0] = SECTION_CODE;
-	c[1] = 3 + n_byte_length;
-	c[2] = 0x1;
+	c[1] = 3 + n_byte_length + 5;
+	c[2] = 0x2;
 	c[3] = 1 + n_byte_length;
 	c[4] = 0x0;
 	c += 5 + n_byte_length;
+
+	c[0] = 4;
+	c[1] = 0x0;
+	c[2] = OP_I32_CONST;
+	c[3] = 15;
+	c[4] = OP_END;
+	c += 5;
 
 	return c - compiled_code;
 }
