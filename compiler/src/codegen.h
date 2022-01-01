@@ -48,23 +48,23 @@ struct Node {
 
 	// complex statements
 	union {
-		struct _if {
+		struct _if { // ND_IF
 			Node *condition;
 			Node *then;
 			Node *els;
 		} _if;
-		struct _for {
+		struct _for { // ND_FOR
 			Node *init;
 			Node *condition;
 			Node *increment;
 			Node *then;
 		} _for;
-	};
-
-	union {
+		struct _func { // ND_FUNCCALL
+			char *funcname;
+			Node *args;
+		} _func;
 		Obj *var; // ND_VAR
 		int val; // ND_NUM
-		char *funcname; // ND FUNCCALL
 	};
 };
 

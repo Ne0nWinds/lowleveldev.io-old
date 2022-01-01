@@ -155,6 +155,7 @@ static Node *add();
 static Node *assign();
 static Node *complex_expr();
 static Node *declaration();
+static Node *funcall();
 
 static Obj *find_var(const Token *tok) {
 	for (Obj *var = Locals; var != CurrentLocal; ++var) {
@@ -430,12 +431,7 @@ static Node *primary() {
 
 	if (CurrentToken()->kind == TK_IDENTIFIER) {
 		if (equal(CurrentToken() + 1, "(")) {
-			Node *node = new_node(ND_FUNCCALL);
-			node->funcname = new_funcname(CurrentToken()->loc, CurrentToken()->len);
-			NextToken();
-			skip("(");
-			skip(")");
-			return node;
+			return funcall();
 		}
 
 		Obj *var = find_var(CurrentToken());
@@ -453,6 +449,30 @@ static Node *primary() {
 	error_tok(CurrentToken(), "expected an expression");
 	error_parsing = true;
 	return 0;
+}
+
+static Node *funcall() {
+	print("!234");
+	Node *node = new_node(ND_FUNCCALL);
+	node->tok = (Token *)CurrentToken();
+	node->_func.funcname = new_funcname(CurrentToken()->loc, CurrentToken()->len);
+
+	NextToken();
+	skip("(");
+
+	Node *current;
+	if (!equal(CurrentToken(), ")")) {
+		current = node->_func.args = assign();
+
+		while (!equal(CurrentToken(), ")")) {
+			skip(",");
+			current = current->next = assign();
+		}
+
+	}
+
+	NextToken();
+	return node;
 }
 
 Type *pointer_to(Type *base);
@@ -742,8 +762,21 @@ static void _gen_expr(Node *node, int *depth) {
 			return;
 		}
 		case ND_FUNCCALL: {
+			printf("%s - 0x%x\n", node->_func.funcname, (unsigned int)node->_func.args);
+			Node *current = node->_func.args;
+			while (current) {
+				int _depth = 0;
+				_gen_expr(current, &_depth);
+				current = current->next;
+			}
 			c[n_byte_length++] = OP_CALL;
-			c[n_byte_length++] = 1;
+			if (*node->_func.funcname == 'r') {
+				c[n_byte_length++] = 1; // ret15
+			} else if (*node->_func.funcname == 'a') {
+				c[n_byte_length++] = 2; // add
+			} else {
+				c[n_byte_length++] = 3; // sub
+			}
 			*depth += 1;
 			return;
 		}

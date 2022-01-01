@@ -41,20 +41,28 @@ extern unsigned int compile() {
 	c += WASM_header(c);
 
 	c[0] = SECTION_TYPE;
-	c[1] = 0x05;
-	c[2] = 0x01;
+	c[1] = 0x0B;
+	c[2] = 0x02;
 	c[3] = 0x60;
 	c[4] = 0;
 	c[5] = 1;
 	c[6] = VAL_I32;
-	c += 7;
+	c[7] = 0x60;
+	c[8] = 2;
+	c[9] = VAL_I32;
+	c[10] = VAL_I32;
+	c[11] = 1;
+	c[12] = VAL_I32;
+	c += 13;
 
 	c[0] = SECTION_FUNC;
-	c[1] = 0x3;
-	c[2] = 0x2;
+	c[1] = 0x5;
+	c[2] = 0x4;
 	c[3] = 0x0;
 	c[4] = 0x0;
-	c += 5;
+	c[5] = 0x1;
+	c[6] = 0x1;
+	c += 7;
 
 	c[0] = SECTION_MEMORY;
 	c[1] = 0x3;
@@ -101,8 +109,8 @@ extern unsigned int compile() {
 	c -= 5;
 
 	c[0] = SECTION_CODE;
-	c[1] = 3 + n_byte_length + 5;
-	c[2] = 0x2;
+	c[1] = 3 + n_byte_length + 5 + 9 + 9;
+	c[2] = 0x4;
 	c[3] = 1 + n_byte_length;
 	c[4] = 0x0;
 	c += 5 + n_byte_length;
@@ -113,6 +121,28 @@ extern unsigned int compile() {
 	c[3] = 15;
 	c[4] = OP_END;
 	c += 5;
+
+	c[0] = 8;
+	c[1] = 0x0;
+	c[2] = OP_GET_LOCAL;
+	c[3] = 0;
+	c[4] = OP_GET_LOCAL;
+	c[5] = 1;
+	c[6] = OP_I32_ADD;
+	c[7] = OP_RETURN;
+	c[8] = OP_END;
+	c += 9;
+
+	c[0] = 8;
+	c[1] = 0x0;
+	c[2] = OP_GET_LOCAL;
+	c[3] = 0;
+	c[4] = OP_GET_LOCAL;
+	c[5] = 1;
+	c[6] = OP_I32_SUB;
+	c[7] = OP_RETURN;
+	c[8] = OP_END;
+	c += 9;
 
 	return c - compiled_code;
 }

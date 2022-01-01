@@ -60,6 +60,7 @@ async function compile(value) {
 	}
 
 	binary = new Uint8Array(compiler.memory.buffer, compiler.get_compiled_code(), len);
+	console.log(binary);
 	const compilationToWebAssembly = performance.now();
 
 	const { instance } = await WebAssembly.instantiate(binary);
@@ -117,7 +118,11 @@ if (ENABLE_TEST_CASES) {
 		['{ int x = 3; int *y = &x; int z = &y; x = x + 1; return **z; }', 4],
 		['{ int x = 0; int *y = &x; *y = 1; return x; }', 1],
 		['{ int x = 10; int *y = &x; *y = 22; return x; }', 22],
-		['{ return ret15(); }', 15]
+		['{ return ret15(); }', 15],
+		['{ return add(1, 2); }', 3],
+		['{ return sub(10, 5); }', 5],
+		['{ return add(ret15(), 2); }', 17],
+		['{ return add(add(5, 5), sub(10, 8)); }', 12],
 	];
 
 	void async function() {

@@ -28,6 +28,11 @@ enum Valtype {
 // https://webassembly.github.io/spec/core/binary/instructions.html
 enum OpCode {
 	OP_GET_LOCAL = 0x20,
+	OP_SET_LOCAL = 0x21,
+	OP_TEE_LOCAL = 0x22,
+	OP_GET_GLOBAL = 0x23,
+	OP_SET_GLOBAL = 0x24,
+
 	OP_F32_ADD = 0x92,
 
 	OP_DROP = 0x1A,
