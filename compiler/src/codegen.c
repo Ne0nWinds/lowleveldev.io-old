@@ -100,6 +100,11 @@ static Obj Locals[512];
 Obj *CurrentLocal = 0;
 static char *Names[2048] = {0};
 char *CurrentChar = (char *)Names;
+static Function Functions[128] = {0};
+static Function *CurrentFunction;
+static unsigned int FunctionCount;
+static Type Types[128] = {0};
+static Type *CurrentType;
 
 static Node *new_variable(Obj *var) {
 	Node *node = new_node(ND_VAR);
@@ -156,6 +161,7 @@ static Node *assign();
 static Node *complex_expr();
 static Node *declaration();
 static Node *funcall();
+static Function *function();
 
 static Obj *find_var(const Token *tok) {
 	for (Obj *var = Locals; var != CurrentLocal; ++var) {
@@ -171,17 +177,12 @@ Function *ParseTokens() {
 	ResetCurrentToken();
 	error_parsing = false;
 	memset(AllNodes, 0, sizeof(AllNodes));
-	skip("{");
-	Node *head = complex_expr();
-	Node *LocalCurrent = head;
-	while (CurrentToken()->kind && !error_parsing) {
-		LocalCurrent->next = complex_expr();
-		LocalCurrent = LocalCurrent->next;
-	}
-	static Function prog = {0};
-	prog.body = head;
-	prog.locals = Locals;
-	return (!error_parsing) ? &prog : 0;
+	CurrentFunction = Functions;
+	CurrentType = Types;
+	while (CurrentToken()->kind && !error_parsing)
+		function();
+	FunctionCount = CurrentFunction - Functions;
+	return (!error_parsing && FunctionCount) ? Functions : 0;
 }
 
 static Node *new_expr() {
@@ -452,7 +453,6 @@ static Node *primary() {
 }
 
 static Node *funcall() {
-	print("!234");
 	Node *node = new_node(ND_FUNCCALL);
 	node->tok = (Token *)CurrentToken();
 	node->_func.funcname = new_funcname(CurrentToken()->loc, CurrentToken()->len);
@@ -525,8 +525,24 @@ static Node *declaration() {
 	return node;
 }
 
-static Type Types[128] = {0};
-static Type *CurrentType;
+static Function *function() {
+	Type *type = declspec();
+	type = declarator(type);
+
+	Function *fn = CurrentFunction++;
+	*fn = (Function){0};
+	fn->name = new_funcname(CurrentToken()->loc, CurrentToken()->len);
+	NextToken();
+	skip("(");
+	skip(")");
+	skip("{");
+	Obj *start = CurrentLocal;
+	fn->body = complex_expr();
+	fn->locals = start;
+	fn->local_count = CurrentLocal - start;
+	return fn;
+}
+
 Type *pointer_to(Type *base) {
 	Type *type = CurrentType++;
 	type->kind = TYPE_PTR;
@@ -535,15 +551,14 @@ Type *pointer_to(Type *base) {
 }
 
 void add_type(Node *node) {
-	if (!node || node->type)
-		return;
+	if (!node) return;
 	
 	add_type(node->lhs);
 	add_type(node->rhs);
-	add_type(node->_for.init);
-	add_type(node->_for.condition);
-	add_type(node->_for.increment);
-	add_type(node->_for.then);
+	// add_type(node->_for.init);
+	// add_type(node->_for.condition);
+	// add_type(node->_for.increment);
+	// add_type(node->_for.then);
 
 	switch (node->kind) {
 		case ND_ADD:
@@ -614,10 +629,11 @@ void print_tree(Node *node) {
 	}
 }
 
+static unsigned int total_byte_length;
 static unsigned int n_byte_length;
 static unsigned char *c = 0;
 
-static int count = 0;
+static Function *current_fn;
 
 static void _gen_expr(Node *node, int *depth) {
 	switch (node->kind) {
@@ -680,8 +696,6 @@ static void _gen_expr(Node *node, int *depth) {
 				c[n_byte_length++] = OP_I32_STORE;
 				c[n_byte_length++] = 2;
 				c[n_byte_length++] = 0;
-			} else {
-				print("Well fuck!");
 			}
 			*depth -= 1;
 			return;
@@ -693,7 +707,6 @@ static void _gen_expr(Node *node, int *depth) {
 			return;
 		}
 		case ND_IF: {
-			++count;
 			int _depth = 0;
 			_gen_expr(node->_if.condition, &_depth);
 			c[n_byte_length++] = OP_I32_CONST;
@@ -770,12 +783,10 @@ static void _gen_expr(Node *node, int *depth) {
 				current = current->next;
 			}
 			c[n_byte_length++] = OP_CALL;
-			if (*node->_func.funcname == 'r') {
-				c[n_byte_length++] = 1; // ret15
-			} else if (*node->_func.funcname == 'a') {
-				c[n_byte_length++] = 2; // add
-			} else {
-				c[n_byte_length++] = 3; // sub
+			for (int i = 0; i < FunctionCount; ++i) {
+				if (!strncmp(node->_func.funcname, Functions[i].name, -1)) {
+					c[n_byte_length++] = i;
+				}
 			}
 			*depth += 1;
 			return;
@@ -841,31 +852,109 @@ static void _gen_expr(Node *node, int *depth) {
 
 static void assign_lvar_offsets(Function *prog) {
 	int offset = 0;
-	for (Obj *var = Locals; var < CurrentLocal; ++var) {
+	for (int i = 0; i < prog->local_count; ++i) {
+		Obj *var = prog->locals + i;
 		offset += 4;
 		var->offset = 128 - offset;
 	}
 	prog->stack_size += align_to(offset, 16);
 }
 
-void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *output_code) {
-	n_byte_length = *byte_length;
+static unsigned long WASM_header(unsigned char *c) {
+	c[0] = 0;
+	c[1] = 'a';
+	c[2] = 's';
+	c[3] = 'm';
+	c[4] = 1;
+	c[5] = 0;
+	c[6] = 0;
+	c[7] = 0;
+	return 8;
+}
+
+unsigned int gen_expr(unsigned char *output_code) {
 	c = output_code;
-	count = 0;
 	CurrentType = Types;
 
-	assign_lvar_offsets(prog);
+	c += WASM_header(c);
 
-	int depth = 0;
-	_gen_expr(prog->body, &depth);
-	printf("depth: %d", depth);
-	if (depth == 0) {
-		c[n_byte_length++] = OP_I32_CONST;
-		c[n_byte_length++] = 0;
-		c[n_byte_length++] = OP_RETURN;
-		print("Adding 0 as default result");
-		printf("OP_I32_CONST: %d\n", 0);
+	c[0] = SECTION_TYPE;
+	c[1] = 0x05;
+	c[2] = 0x01;
+	c[3] = 0x60;
+	c[4] = 0;
+	c[5] = 1;
+	c[6] = VAL_I32;
+	c += 7;
+
+	c[0] = SECTION_FUNC;
+	c[1] = 0x1 + FunctionCount;
+	c[2] = FunctionCount;
+	c += 3;
+	memset(c, 0, FunctionCount);
+	c += FunctionCount;
+
+	c[0] = SECTION_MEMORY;
+	c[1] = 0x3;
+	c[2] = 0x1;
+	c[3] = 0x0;
+	c[4] = 0x1;
+	c += 5;
+
+	c[0] = SECTION_EXPORT;
+	c[1] = 0x08;
+	c[2] = 0x01;
+	c[3] = 4;
+	c[4] = 'm';
+	c[5] = 'a';
+	c[6] = 'i';
+	c[7] = 'n';
+	c[8] = EXPORT_FUNC;
+	c[9] = 255;
+	for (unsigned int i = 0; i < FunctionCount; ++i) {
+		if (!strncmp(Functions[i].name, "main", 5)) {
+			c[9] = i;
+			break;
+		}
+	}
+	if (c[9] == 255) {
+		print("Could not find main function");
+		return 0;
+	}
+	c += 10;
+
+	c[0] = SECTION_CODE;
+	unsigned char *CodeSectionLength = c + 1;
+	c[2] = FunctionCount;
+	c += 3;
+
+	for (int i = 0; i < FunctionCount; ++i) {
+		Function *f = Functions + i;
+		n_byte_length = 0;
+		c += 2;
+
+		assign_lvar_offsets(f);
+
+		int depth = 0;
+		_gen_expr(f->body, &depth);
+		printf("depth: %d", depth);
+		if (depth == 0) {
+			c[n_byte_length++] = OP_I32_CONST;
+			c[n_byte_length++] = 0;
+			c[n_byte_length++] = OP_RETURN;
+			print("Adding 0 as default result");
+			printf("OP_I32_CONST: %d\n", 0);
+		}
+
+		c[n_byte_length++] = OP_END;
+		c -= 2;
+
+		c[0] = 1 + n_byte_length;
+		c[1] = 0x0;
+		c += 2 + n_byte_length;
 	}
 
-	*byte_length = n_byte_length;
+	*CodeSectionLength = c - CodeSectionLength - 1;
+
+	return c - output_code;
 }

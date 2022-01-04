@@ -30,6 +30,7 @@ typedef enum {
 typedef enum {
 	TYPE_INT = 1,
 	TYPE_PTR,
+	TYPE_FUNC,
 } TypeKind;
 
 typedef struct Node Node;
@@ -75,17 +76,22 @@ struct Obj {
 
 struct Function {
 	Node *body;
+	char *name;
 	Obj *locals;
+	unsigned int local_count;
 	int stack_size;
 };
 
 struct Type {
 	TypeKind kind;
-	Type *base;
-	Token *name;
+	union {
+		Type *base; // pointer
+		Type *return_type; // function type
+		Token *name; // declaration
+	};
 };
 
-void gen_expr(Function *prog, unsigned int *byte_length, unsigned char *c);
+unsigned int gen_expr(unsigned char *c);
 Function *ParseTokens();
 void print_tree(Node *node);
 
