@@ -2,6 +2,7 @@
 #include "tokenize.h"
 #include "standard_functions.h"
 
+// TODO: Make Unified Memory Allocator
 Node AllNodes[512] = {0};
 Node *CurrentNode = AllNodes;
 static bool error_parsing = false;
@@ -910,20 +911,24 @@ unsigned int gen_expr(unsigned char *output_code) {
 	c[6] = 'i';
 	c[7] = 'n';
 	c[8] = EXPORT_FUNC;
-	c[9] = 255;
-	for (unsigned int i = 0; i < FunctionCount; ++i) {
-		if (!strncmp(Functions[i].name, "main", 5)) {
-			c[9] = i;
+	c[9] = 0;
+	c += 9;
+	n_byte_length = 0;
+	unsigned int f = 0;
+	for (; f < FunctionCount; ++f) {
+		if (!strncmp(Functions[f].name, "main", 4)) {
+			EncodeLEB128(c, f, n_byte_length);
 			break;
 		}
 	}
-	if (c[9] == 255) {
+	if (f == FunctionCount && *c == 0) {
 		print("Could not find main function");
 		return 0;
 	}
-	c += 10;
+	c += n_byte_length;
 
 	c[0] = SECTION_CODE;
+	// TODO: Allow Variable Length Byte Length
 	unsigned char *CodeSectionLength = c + 1;
 	c[2] = FunctionCount;
 	c += 3;

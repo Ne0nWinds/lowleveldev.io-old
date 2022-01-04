@@ -1,5 +1,6 @@
 #pragma once
 #include "defines.h"
+// TODO: Assertion functions
 #define memset(str, c, n) __builtin_memset(str, c, n)
 #define memcpy(dst, src, n) __builtin_memcpy(dst, src, n)
 unsigned int strlen(const char *str);
@@ -19,6 +20,7 @@ void error_at(char *loc, char *fmt, ...);
 void error(const char *str);
 void error_tok(const Token *token, char *fmt, ...);
 
+// TODO: Look into optimizing this
 #define EncodeLEB128(writeable, x, n_byte_length) {\
 	typeof(x) value = x;\
 	unsigned char *src = writeable;\
